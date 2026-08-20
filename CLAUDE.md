@@ -10,11 +10,10 @@ mount, no loop device.
 - **Sibling:** `../mkfs.dos.rs` provides the on-disk format, the `BlockDevice`
   seam, the read layer and `fsck`. The two are developed together.
 
-## Dependency form — outstanding
+## Dependency form
 
-`mkfs-dos` is taken **by path** at the moment, because `mkfs.dos.rs` has not
-been pushed to GitHub yet. Before anything takes this crate by git, it must
-become:
+`mkfs-dos` is taken **by git, pinned to a tag**, with a `[patch]` section
+pointing at `../mkfs.dos.rs` for local development:
 
 ```toml
 mkfs-dos = { git = "https://github.com/glennswest/mkfs.dos.rs", tag = "v0.1.0", default-features = false }
@@ -23,9 +22,13 @@ mkfs-dos = { git = "https://github.com/glennswest/mkfs.dos.rs", tag = "v0.1.0", 
 mkfs-dos = { path = "../mkfs.dos.rs" }
 ```
 
-A path dependency inside a git dependency only resolves when the path is inside
-the same repository, so leaving it as it is makes this crate unusable by a
-consumer that takes it by git — the same trap as fio.ext4.rs#1.
+It must stay that way. A path dependency inside a git dependency only resolves
+when the path is inside the same repository, so a path form here makes this
+crate unusable by a consumer that takes it by git — the same trap as
+fio.ext4.rs#1. The patch applies only to the crate being built, so a consumer
+never sees it. Verified by building a throwaway crate that takes this one by
+git; the local checkout building is not evidence, since the patch hides the
+problem.
 
 ## Shape
 
@@ -59,7 +62,6 @@ consumer that takes it by git — the same trap as fio.ext4.rs#1.
 - [x] `fio-dos` binary — ls, tree, cat, put, get, mkdir, rm, rmdir, mv, label, info
 - [x] `tests/verify-on-linux.sh` — the kernel reads every file we wrote, then
       writes, and we read that back. All three widths pass in both directions.
-- [ ] Switch the `mkfs-dos` dependency to the git form once the repo is pushed
 - [ ] Partial writes at an offset, rather than whole-file replace
 - [ ] Streaming reads and writes, so a file larger than memory can be handled
 - [ ] Unpack a tar archive straight into a volume, as `fio-ext4` does — FAT has

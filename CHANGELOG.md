@@ -34,3 +34,8 @@ Linux kernel, and files the kernel writes are read back here.
 
 ## [Unreleased]
 <!-- New unreleased changes go here -->
+
+### 2026-08-20
+- **build:** take `mkfs-dos` by git tag rather than by path, with a `[patch]`
+  for local development — a path dependency inside a git dependency does not
+  resolve for a consumer
