@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         Command::Ls { path, long } => {
             let mut entries = vol.read_dir(&path).await?;
-            entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            entries.sort_by_key(|e| e.name.to_lowercase());
             for entry in entries {
                 if long {
                     println!(
@@ -208,7 +208,7 @@ async fn tree(
     depth: usize,
 ) -> anyhow::Result<()> {
     let mut entries = vol.read_dir(path).await?;
-    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    entries.sort_by_key(|e| e.name.to_lowercase());
     for entry in entries {
         println!(
             "{:indent$}{}{}",
