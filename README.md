@@ -43,8 +43,13 @@ not have either crate.
 The binary:
 
 ```sh
-cargo install --git https://github.com/glennswest/fio.dos.rs --tag v0.1.0
+cargo install --git https://github.com/glennswest/fio.dos.rs --rev e559711
 ```
+
+Install from `e559711` or later, not from the `v0.1.0` tag. That tag's
+`Cargo.toml` still carries a `[patch]` pointing at a sibling `../mkfs.dos.rs`
+checkout. `cargo install` applies it and fails (#4). A library dependency on
+the tag is unaffected, because cargo ignores `[patch]` in a dependency.
 
 There is no container image, service, port or configuration file. It is a
 library and a command-line tool, and nothing else.
@@ -95,6 +100,13 @@ absolute inside the volume and uses `/`:
 `Attrs::read_only()`, `Attrs::system()` (hidden + system) and
 `.modified_at(secs)` give a file its attributes as it is created.
 
+`read_dir` returns `Entry` values, and `stat` returns a `Stat` (the same type).
+Each one carries the long name, the short name, `is_dir`, the size, the
+`Attributes` bits, the modified and created times in Unix seconds, and the
+first cluster. Every call returns `fio_dos::Result`, whose error is
+`fio_dos::Error`. `Volume`, `Attrs`, `Entry`, `Stat`, `Attributes`, `Error` and
+`Result` are all re-exported at the crate root.
+
 Writes replace the whole file. There are no partial writes at an offset and no
 streaming yet, so a file is held in memory in full on the way in and out.
 
@@ -144,7 +156,9 @@ byte for byte** — 310 files per image, sizes from 0 bytes to 300 KB, long name
 Unicode names, nested directories and a directory grown past a cluster. Then the
 kernel writes to the image, and the result is read back here and compared again.
 
-Both directions pass on FAT12, FAT16 and FAT32:
+Both directions passed on FAT12, FAT16 and FAT32 when `v0.1.0` was cut
+(2026-08-19). That is the last recorded run. The check needs root on a
+loop-mount host, and nothing in `sc-build` runs it (#1).
 
 ```
 fill (no kernel) -> fsck.fat -> mount -> kernel reads all 310 files
@@ -157,7 +171,7 @@ The kernel settles the second.
 
 ## Testing
 
-`cargo test` runs the round-trip suite (`tests/roundtrip.rs`) on FAT12, FAT16
+`cargo test` (what `sc-build` runs, after `cargo build`) runs the round-trip suite (`tests/roundtrip.rs`) on FAT12, FAT16
 and FAT32 images it creates in temporary files. Every test ends with a check by
 `mkfs_dos::fsck`, the Rust reimplementation of `fsck.fat` in the companion
 crate. It needs no root and no kernel.

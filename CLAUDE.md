@@ -82,3 +82,6 @@ loop-mount host, so sessions cannot run it. See #1.
 - [x] #3/#2 — mkfs-dos pinned to commit a55c537 with no `[patch]`. sc-build
       passes (2026-09-27). Nothing in progress. Next: #1, then the open items above.
 - [ ] #1 — kernel verification as a `fio-dos-test` container, with no root ssh
+- [ ] #4 — cut `v0.1.1` from `main` so `cargo install --tag` works (the
+      `v0.1.0` tag still has the `[patch]`). Then point the README's install line at it.
+- [x] Docs re-checked against the code; README install line and #4 (2026-09-27)

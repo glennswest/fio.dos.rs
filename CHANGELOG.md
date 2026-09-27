@@ -58,3 +58,9 @@ Linux kernel, and files the kernel writes are read back here.
   tag's commit), and drop the `[patch]` to `../mkfs.dos.rs`. `sc-build` has no
   sibling checkout, so the patch broke every build. Decided in #3, fixes #2.
   CLAUDE.md's dependency section and the README say the same.
+- **docs:** Re-check the docs against the code since 2026-09-18. The README's
+  `cargo install --tag v0.1.0` cannot work, because that tag still carries the
+  `[patch]` to `../mkfs.dos.rs`. Filed #4 to cut `v0.1.1`. Until then the
+  README installs from `--rev e559711`. The README also now describes `Entry`,
+  `Stat` and the crate-root re-exports, and says that the kernel check last
+  passed on 2026-08-19 and that `sc-build` does not run it (#1).
