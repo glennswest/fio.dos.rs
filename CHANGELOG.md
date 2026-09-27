@@ -64,3 +64,7 @@ Linux kernel, and files the kernel writes are read back here.
   README installs from `--rev e559711`. The README also now describes `Entry`,
   `Stat` and the crate-root re-exports, and says that the kernel check last
   passed on 2026-08-19 and that `sc-build` does not run it (#1).
+- **docs:** Another pass against the code. There is no code change since the
+  last refresh, and the README's API and CLI tables still match. The CLAUDE.md
+  work plan now names #4 as next, and says that the kernel check last passed
+  on 2026-08-19.

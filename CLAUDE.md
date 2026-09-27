@@ -71,7 +71,8 @@ loop-mount host, so sessions cannot run it. See #1.
 - [x] `alloc`, `name`, `dir`, `volume`, and the round-trip suite
 - [x] `fio-dos` binary — ls, tree, cat, put, get, mkdir, rm, rmdir, mv, label, info
 - [x] `tests/verify-on-linux.sh` — the kernel reads every file we wrote, then
-      writes, and we read that back. All three widths pass in both directions.
+      writes, and we read that back. All three widths passed in both directions
+      when v0.1.0 was cut (2026-08-19), the last recorded run (#1).
 - [ ] Partial writes at an offset, rather than whole-file replace
 - [ ] Streaming reads and writes, so a file larger than memory can be handled
 - [ ] Unpack a tar archive straight into a volume, as `fio-ext4` does — FAT has
@@ -80,7 +81,7 @@ loop-mount host, so sessions cannot run it. See #1.
 - [ ] Free-space defragmentation for a volume rewritten many times
 - [x] Docs refreshed from the code (2026-09-27)
 - [x] #3/#2 — mkfs-dos pinned to commit a55c537 with no `[patch]`. sc-build
-      passes (2026-09-27). Nothing in progress. Next: #1, then the open items above.
+      passes (2026-09-27). Nothing in progress. Next: #4 (cut v0.1.1), #1, then the open items above.
 - [ ] #1 — kernel verification as a `fio-dos-test` container, with no root ssh
 - [ ] #4 — cut `v0.1.1` from `main` so `cargo install --tag` works (the
       `v0.1.0` tag still has the `[patch]`). Then point the README's install line at it.
