@@ -21,9 +21,10 @@ path = "src/lib.rs"
 # resolves when the path is inside the same repository, so a path here would
 # make this crate unusable by anything that takes it by git.
 #
-# Pinned to a tag rather than a branch, so a consumer's build is reproducible:
-# floating on main means two builds a day apart can resolve differently.
-mkfs-dos = { git = "https://github.com/glennswest/mkfs.dos.rs", tag = "v0.1.0", default-features = false }
+# Pinned to a commit (the v0.1.0 tag's) and bumped deliberately when
+# mkfs.dos.rs changes. There is no [patch] to a sibling checkout: sc-build
+# builds one pushed commit with nothing beside it (#3).
+mkfs-dos = { git = "https://github.com/glennswest/mkfs.dos.rs", rev = "a55c537d890c2007a7e12d48fc7ad50aa4ef57d5", default-features = false }
 
 tokio = { version = "1", features = ["fs", "io-std", "io-util", "rt", "sync", "macros"] }
 async-trait = "0.1"
@@ -45,13 +46,6 @@ cli = ["dep:clap", "dep:anyhow", "tokio/rt-multi-thread"]
 name = "fio-dos"
 path = "src/bin/fio_dos.rs"
 required-features = ["cli"]
-
-# Day-to-day development builds against the sibling checkout, so a change to
-# mkfs-dos is picked up without a commit and a push. Patch sections apply only
-# to the crate being built, so a downstream consumer never sees this and
-# resolves the git dependency above.
-[patch."https://github.com/glennswest/mkfs.dos.rs"]
-mkfs-dos = { path = "../mkfs.dos.rs" }
 
 [profile.release]
 lto = true

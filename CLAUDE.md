@@ -8,34 +8,35 @@ mount, no loop device.
 - **Licence:** MIT OR Apache-2.0
 - **Repo:** https://github.com/glennswest/fio.dos.rs
 - **Sibling:** `../mkfs.dos.rs` provides the on-disk format, the `BlockDevice`
-  seam, the read layer and `fsck`. The two are developed together.
+  seam, the read layer and `fsck`. It is taken by pinned commit, not by the
+  sibling checkout (see below).
 
 ## Dependency form
 
-`mkfs-dos` is taken **by git, pinned to a tag**, with a `[patch]` section
-pointing at `../mkfs.dos.rs` for local development:
+`mkfs-dos` is taken **by git, pinned to a commit**. No `[patch]` points at a
+sibling checkout. This was decided in #3.
 
 ```toml
-mkfs-dos = { git = "https://github.com/glennswest/mkfs.dos.rs", tag = "v0.1.0", default-features = false }
-
-[patch."https://github.com/glennswest/mkfs.dos.rs"]
-mkfs-dos = { path = "../mkfs.dos.rs" }
+mkfs-dos = { git = "https://github.com/glennswest/mkfs.dos.rs", rev = "a55c537d890c2007a7e12d48fc7ad50aa4ef57d5", default-features = false }
 ```
 
-It must stay that way. A path dependency inside a git dependency only resolves
-when the path is inside the same repository, so a path form here makes this
-crate unusable by a consumer that takes it by git — the same trap as
-fio.ext4.rs#1. The patch applies only to the crate being built, so a consumer
-never sees it. Verified by building a throwaway crate that takes this one by
-git; the local checkout building is not evidence, since the patch hides the
-problem.
+`a55c537` is the `v0.1.0` tag's commit. Bump the `rev` deliberately when
+mkfs.dos.rs changes: push the mkfs.dos.rs change first, then move the `rev`
+here in its own commit. `sc-build` builds one pushed commit with nothing beside
+it, and that stays the rule, so a `[patch]` path to `../mkfs.dos.rs` breaks
+every build (#2).
+
+It must not become a path dependency either. A path dependency inside a git
+dependency only resolves when the path is inside the same repository, so a
+path form here makes this crate unusable by a consumer that takes it by git.
+That is the same trap as fio.ext4.rs#1.
 
 ## How it ships
 
 A library crate plus the `fio-dos` binary (behind the default `cli` feature).
 Consumers take it by git tag. There is no crates.io release, container image,
 service, port or configuration file. It is not a stormcentral component with a
-golden. Build and test with `sc-build` (`cargo build && cargo test`). It fails today because the `[patch]` path `../mkfs.dos.rs` does not exist on the build box (#2). The
+golden. Build and test with `sc-build` (`cargo build && cargo test`). The
 round-trip suite needs no root. `tests/verify-on-linux.sh` needs root on a
 loop-mount host, so sessions cannot run it. See #1.
 

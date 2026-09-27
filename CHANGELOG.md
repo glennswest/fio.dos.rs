@@ -54,3 +54,7 @@ Linux kernel, and files the kernel writes are read back here.
 - **docs:** Re-check the README against the code. `append` rewrites the whole
   file, `verify-on-linux.sh` defaults to `root@dev.g8.lo`, and the pointer to
   the kernel check now says it is under *Verified*, not below.
+- **build:** Take `mkfs-dos` by git pinned to a commit (`a55c537`, the `v0.1.0`
+  tag's commit), and drop the `[patch]` to `../mkfs.dos.rs`. `sc-build` has no
+  sibling checkout, so the patch broke every build. Decided in #3, fixes #2.
+  CLAUDE.md's dependency section and the README say the same.

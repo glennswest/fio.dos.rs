@@ -315,6 +315,7 @@ dependencies = [
 [[package]]
 name = "mkfs-dos"
 version = "0.1.0"
+source = "git+https://github.com/glennswest/mkfs.dos.rs?rev=a55c537d890c2007a7e12d48fc7ad50aa4ef57d5#a55c537d890c2007a7e12d48fc7ad50aa4ef57d5"
 dependencies = [
  "async-trait",
  "bitflags",

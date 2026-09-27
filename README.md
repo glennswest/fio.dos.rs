@@ -37,7 +37,7 @@ fio-dos = { git = "https://github.com/glennswest/fio.dos.rs", tag = "v0.1.0", de
 `default-features = false` drops the `cli` feature (clap, anyhow and the
 multi-threaded tokio runtime), which only the binary needs. `mkfs-dos` is
 re-exported as `fio_dos::mkfs_dos`, so one dependency is enough. It comes in
-by git tag as well, so building needs network access to GitHub. Crates.io does
+by git, pinned to a commit, so building needs network access to GitHub. Crates.io does
 not have either crate.
 
 The binary:
