@@ -51,3 +51,6 @@ Linux kernel, and files the kernel writes are read back here.
   under `sc-build` or the test standard.
 - **docs:** Record that `sc-build` fails because the build box has no `../mkfs.dos.rs`
   for the `[patch]` to point at (#2).
+- **docs:** Re-check the README against the code. `append` rewrites the whole
+  file, `verify-on-linux.sh` defaults to `root@dev.g8.lo`, and the pointer to
+  the kernel check now says it is under *Verified*, not below.

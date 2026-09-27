@@ -81,7 +81,7 @@ absolute inside the volume and uses `/`:
 |---|---|
 | `read(path)` | the whole file, as a `Vec<u8>` |
 | `write(path, data)` / `write_with(path, data, &Attrs)` | create or replace a whole file |
-| `append(path, data)` | add to the end of a file |
+| `append(path, data)` | add to the end of a file (it reads the file and writes it back whole) |
 | `mkdir` / `mkdir_all` | one directory, or a path with its parents |
 | `unlink` / `rmdir` / `remove_all` | a file, an empty directory, or a tree |
 | `rename(from, to)` | move or rename, across directories, with `..` kept right |
@@ -162,8 +162,8 @@ and FAT32 images it creates in temporary files. Every test ends with a check by
 `mkfs_dos::fsck`, the Rust reimplementation of `fsck.fat` in the companion
 crate. It needs no root and no kernel.
 
-`tests/verify-on-linux.sh [user@host]` is the kernel check below. It needs a
-Linux host where it can loop-mount an image, which means root there, plus
+`tests/verify-on-linux.sh [user@host]` is the kernel check described under
+*Verified*. The host defaults to `root@dev.g8.lo`. It needs a Linux host where it can loop-mount an image, which means root there, plus
 `fsck.fat` and `python3` on that host. It also expects the
 `mkfs.dos.rs` checkout next to this one, because it uses that crate's `fsck-fat`
 binary.
