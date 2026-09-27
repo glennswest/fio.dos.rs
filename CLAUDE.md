@@ -35,7 +35,7 @@ problem.
 A library crate plus the `fio-dos` binary (behind the default `cli` feature).
 Consumers take it by git tag. There is no crates.io release, container image,
 service, port or configuration file. It is not a stormcentral component with a
-golden. Build and test with `sc-build` (`cargo build && cargo test`). The
+golden. Build and test with `sc-build` (`cargo build && cargo test`). It fails today because the `[patch]` path `../mkfs.dos.rs` does not exist on the build box (#2). The
 round-trip suite needs no root. `tests/verify-on-linux.sh` needs root on a
 loop-mount host, so sessions cannot run it. See #1.
 

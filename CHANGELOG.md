@@ -49,3 +49,5 @@ Linux kernel, and files the kernel writes are read back here.
   includes it. The attribute-string comment in the binary is corrected
   (`drhsa`). Filed #1: the kernel verification needs root ssh, so it cannot run
   under `sc-build` or the test standard.
+- **docs:** Record that `sc-build` fails because the build box has no `../mkfs.dos.rs`
+  for the `[patch]` to point at (#2).
