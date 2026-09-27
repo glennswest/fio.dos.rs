@@ -22,6 +22,11 @@ Linux kernel, and files the kernel writes are read back here.
 - `examples/fill.rs` and `examples/verify.rs` — write a known set of files, and
   check an image against it.
 
+### Changed
+- Take `mkfs-dos` by git tag rather than by path, with a `[patch]` for local
+  development. A path dependency inside a git dependency does not resolve for a
+  consumer. Committed on 2026-08-20 and included in the `v0.1.0` tag.
+
 ### Testing
 - Round-trip suite across FAT12, FAT16 and FAT32, every test ending with a
   `fsck.fat` check of the filesystem it produced: awkward file sizes either side
@@ -35,7 +40,12 @@ Linux kernel, and files the kernel writes are read back here.
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
-### 2026-08-20
-- **build:** take `mkfs-dos` by git tag rather than by path, with a `[patch]`
-  for local development — a path dependency inside a git dependency does not
-  resolve for a consumer
+### 2026-09-27
+- **docs:** Refresh the README from the code. It now covers taking the crate by
+  git tag, installing the binary, the full `Volume` API, the CLI command
+  reference, and what `cargo test` and `verify-on-linux.sh` each need. It also
+  states that no container, service, port or configuration file exists. The
+  `build:` entry that sat under Unreleased moved into v0.1.0, since the tag
+  includes it. The attribute-string comment in the binary is corrected
+  (`drhsa`). Filed #1: the kernel verification needs root ssh, so it cannot run
+  under `sc-build` or the test standard.

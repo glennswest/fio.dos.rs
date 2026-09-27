@@ -25,6 +25,30 @@ fio-dos esp.img tree /
 fio-dos esp.img info
 ```
 
+## Using it
+
+As a library, take it by git, pinned to a tag:
+
+```toml
+[dependencies]
+fio-dos = { git = "https://github.com/glennswest/fio.dos.rs", tag = "v0.1.0", default-features = false }
+```
+
+`default-features = false` drops the `cli` feature (clap, anyhow and the
+multi-threaded tokio runtime), which only the binary needs. `mkfs-dos` is
+re-exported as `fio_dos::mkfs_dos`, so one dependency is enough. It comes in
+by git tag as well, so building needs network access to GitHub. Crates.io does
+not have either crate.
+
+The binary:
+
+```sh
+cargo install --git https://github.com/glennswest/fio.dos.rs --tag v0.1.0
+```
+
+There is no container image, service, port or configuration file. It is a
+library and a command-line tool, and nothing else.
+
 ## What it is for
 
 Building the contents of a FAT image, and inspecting one, from a program rather
@@ -45,6 +69,58 @@ Every write keeps in step the things `fsck.fat` checks:
 
 A filesystem written through this crate passes `fsck.fat` — and passes it after
 a real kernel has mounted it and written to it as well.
+
+## The API
+
+`Volume::open(device)` reads the boot sector and the whole FAT. It takes
+anything that implements `mkfs_dos::device::BlockDevice`. `FileDevice` (an
+image file or a device node) is the usual choice. From there, every path is
+absolute inside the volume and uses `/`:
+
+| Call | Does |
+|---|---|
+| `read(path)` | the whole file, as a `Vec<u8>` |
+| `write(path, data)` / `write_with(path, data, &Attrs)` | create or replace a whole file |
+| `append(path, data)` | add to the end of a file |
+| `mkdir` / `mkdir_all` | one directory, or a path with its parents |
+| `unlink` / `rmdir` / `remove_all` | a file, an empty directory, or a tree |
+| `rename(from, to)` | move or rename, across directories, with `..` kept right |
+| `stat` / `exists` / `read_dir` | look without changing anything |
+| `set_attributes` / `set_modified` | the attribute bits and the timestamp |
+| `label` / `set_label` | the volume label |
+| `free_clusters` / `free_bytes` / `filesystem` | space and geometry |
+| `set_time(secs)` | fix the clock, so an image built twice is identical |
+| `flush()` | write the FAT (every copy) and FSInfo back |
+
+`Attrs::read_only()`, `Attrs::system()` (hidden + system) and
+`.modified_at(secs)` give a file its attributes as it is created.
+
+Writes replace the whole file. There are no partial writes at an offset and no
+streaming yet, so a file is held in memory in full on the way in and out.
+
+## The command line
+
+```
+fio-dos <image> <command>
+```
+
+| Command | Does |
+|---|---|
+| `ls [path] [-l]` | list a directory (default `/`). `-l` adds attributes (`drhsa`), size, short name and modification time |
+| `tree [path]` | list everything under a directory, with sizes |
+| `cat <path>` | write a file to stdout |
+| `put <host-file> <path>` | copy a file into the image |
+| `get <path> <host-file>` | copy a file out of the image |
+| `mkdir <path>` | create a directory and any parents it needs |
+| `rm <path> [-r]` | remove a file, or with `-r` a directory and everything in it |
+| `rmdir <path>` | remove an empty directory |
+| `mv <from> <to>` | rename or move |
+| `label [new]` | print the volume label, or set it |
+| `info` | FAT type, label, sector and cluster size, cluster count, free space |
+
+Each command that changes the image flushes before it exits. The image must
+already hold a filesystem. Make one with
+[`mkfs-dos`](https://github.com/glennswest/mkfs.dos.rs).
 
 ## Long names
 
@@ -78,6 +154,19 @@ fill (no kernel) -> fsck.fat -> mount -> kernel reads all 310 files
 
 "We can read our own files" and "the filesystem is right" are different claims.
 The kernel settles the second.
+
+## Testing
+
+`cargo test` runs the round-trip suite (`tests/roundtrip.rs`) on FAT12, FAT16
+and FAT32 images it creates in temporary files. Every test ends with a check by
+`mkfs_dos::fsck`, the Rust reimplementation of `fsck.fat` in the companion
+crate. It needs no root and no kernel.
+
+`tests/verify-on-linux.sh [user@host]` is the kernel check below. It needs a
+Linux host where it can loop-mount an image, which means root there, plus
+`fsck.fat` and `python3` on that host. It also expects the
+`mkfs.dos.rs` checkout next to this one, because it uses that crate's `fsck-fat`
+binary.
 
 ## What FAT does not have
 

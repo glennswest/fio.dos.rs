@@ -30,6 +30,15 @@ never sees it. Verified by building a throwaway crate that takes this one by
 git; the local checkout building is not evidence, since the patch hides the
 problem.
 
+## How it ships
+
+A library crate plus the `fio-dos` binary (behind the default `cli` feature).
+Consumers take it by git tag. There is no crates.io release, container image,
+service, port or configuration file. It is not a stormcentral component with a
+golden. Build and test with `sc-build` (`cargo build && cargo test`). The
+round-trip suite needs no root. `tests/verify-on-linux.sh` needs root on a
+loop-mount host, so sessions cannot run it. See #1.
+
 ## Shape
 
 | Module | What it owns |
@@ -54,7 +63,7 @@ problem.
 5. **Every test ends by checking the filesystem.** A writer that leaves
    `fsck.fat` complaining has damaged the filesystem, not written a file.
 6. **The kernel is the judge.** `tests/verify-on-linux.sh` is the test that
-   counts, and it runs in both directions.
+   counts, and it runs in both directions. Sessions cannot run it yet (#1).
 
 ## Work plan
 
@@ -68,3 +77,5 @@ problem.
       no ownership or symlinks, so it is a smaller job here and worth doing for
       the same reason: building an image without a kernel
 - [ ] Free-space defragmentation for a volume rewritten many times
+- [x] Docs refreshed from the code (2026-09-27)
+- [ ] #1 — kernel verification as a `fio-dos-test` container, with no root ssh

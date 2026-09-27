@@ -187,7 +187,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// `drwha` — the five attribute bits, in the order `attrib` shows them.
+/// `drhsa` — directory, then the four attribute bits `attrib` shows.
 fn attribute_string(attrs: Attributes) -> String {
     let flag = |bit: Attributes, c: char| if attrs.contains(bit) { c } else { '-' };
     [
