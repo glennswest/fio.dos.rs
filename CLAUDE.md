@@ -79,4 +79,6 @@ loop-mount host, so sessions cannot run it. See #1.
       the same reason: building an image without a kernel
 - [ ] Free-space defragmentation for a volume rewritten many times
 - [x] Docs refreshed from the code (2026-09-27)
+- [x] #3/#2 — mkfs-dos pinned to commit a55c537 with no `[patch]`. sc-build
+      passes (2026-09-27). Nothing in progress. Next: #1, then the open items above.
 - [ ] #1 — kernel verification as a `fio-dos-test` container, with no root ssh
