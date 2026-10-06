@@ -60,3 +60,6 @@ Linux kernel, and files the kernel writes are read back here.
 
 ## [Unreleased]
 <!-- New unreleased changes go here -->
+
+### 2026-10-06
+- **docs:** Work plan records #4 done: `v0.1.1` installs with `cargo install --tag`.

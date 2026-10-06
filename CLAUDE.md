@@ -81,11 +81,10 @@ loop-mount host, so sessions cannot run it. See #1.
 - [ ] Free-space defragmentation for a volume rewritten many times
 - [x] Docs refreshed from the code (2026-09-27)
 - [x] #3/#2 — mkfs-dos pinned to commit a55c537 with no `[patch]`. sc-build
-      passes (2026-09-27). Nothing in progress. Next: #4 (cut v0.1.1), #1, then the open items above.
+      passes (2026-09-27).
 - [ ] #1 — kernel verification as a `fio-dos-test` container, with no root ssh
-- [ ] #4 — cut `v0.1.1` from `main` so `cargo install --tag` works (the
-      `v0.1.0` tag still has the `[patch]`). Then point the README's install line at it.
-      In progress (2026-10-06): sc-build `main`, then README + changelog,
-      `chore(release): v0.1.1`, tag, push, and verify with an sc-build that runs
-      `cargo install --git … --tag v0.1.1`.
+- [x] #4 — `v0.1.1` cut from `main` (2026-10-06). sc-build of
+      `cargo install --git … --tag v0.1.1` installs and runs `fio-dos 0.1.1`;
+      the same against `v0.1.0` still fails on the `[patch]`, as expected.
+      Nothing in progress. Next: #1, then the open items above.
 - [x] Docs re-checked against the code; README install line and #4 (2026-09-27)
