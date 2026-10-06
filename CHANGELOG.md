@@ -40,6 +40,11 @@ Linux kernel, and files the kernel writes are read back here.
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-10-06
+- **docs:** The README installs the binary with `--tag v0.1.1` and takes the
+  library by `tag = "v0.1.1"`. `v0.1.0` still cannot be installed with
+  `cargo install`, because of its `[patch]` (#4).
+
 ### 2026-09-27
 - **docs:** Refresh the README from the code. It now covers taking the crate by
   git tag, installing the binary, the full `Volume` API, the CLI command

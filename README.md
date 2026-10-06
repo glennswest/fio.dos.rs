@@ -31,7 +31,7 @@ As a library, take it by git, pinned to a tag:
 
 ```toml
 [dependencies]
-fio-dos = { git = "https://github.com/glennswest/fio.dos.rs", tag = "v0.1.0", default-features = false }
+fio-dos = { git = "https://github.com/glennswest/fio.dos.rs", tag = "v0.1.1", default-features = false }
 ```
 
 `default-features = false` drops the `cli` feature (clap, anyhow and the
@@ -43,13 +43,13 @@ not have either crate.
 The binary:
 
 ```sh
-cargo install --git https://github.com/glennswest/fio.dos.rs --rev e559711
+cargo install --git https://github.com/glennswest/fio.dos.rs --tag v0.1.1
 ```
 
-Install from `e559711` or later, not from the `v0.1.0` tag. That tag's
-`Cargo.toml` still carries a `[patch]` pointing at a sibling `../mkfs.dos.rs`
-checkout. `cargo install` applies it and fails (#4). A library dependency on
-the tag is unaffected, because cargo ignores `[patch]` in a dependency.
+Install from `v0.1.1` or later, not from `v0.1.0`. That tag's `Cargo.toml`
+still carries a `[patch]` pointing at a sibling `../mkfs.dos.rs` checkout, and
+`cargo install` applies it and fails (#4). A library dependency on `v0.1.0`
+still resolves, because cargo ignores `[patch]` in a dependency.
 
 There is no container image, service, port or configuration file. It is a
 library and a command-line tool, and nothing else.
