@@ -85,4 +85,7 @@ loop-mount host, so sessions cannot run it. See #1.
 - [ ] #1 — kernel verification as a `fio-dos-test` container, with no root ssh
 - [ ] #4 — cut `v0.1.1` from `main` so `cargo install --tag` works (the
       `v0.1.0` tag still has the `[patch]`). Then point the README's install line at it.
+      In progress (2026-10-06): sc-build `main`, then README + changelog,
+      `chore(release): v0.1.1`, tag, push, and verify with an sc-build that runs
+      `cargo install --git … --tag v0.1.1`.
 - [x] Docs re-checked against the code; README install line and #4 (2026-09-27)
