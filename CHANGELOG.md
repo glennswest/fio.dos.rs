@@ -1,5 +1,26 @@
 # Changelog
 
+## [v0.1.1] — 2026-10-06
+
+A packaging fix. The library and the binary behave exactly as in v0.1.0.
+
+### Fixed
+- `cargo install --git https://github.com/glennswest/fio.dos.rs --tag v0.1.1`
+  works. The `v0.1.0` tag's `Cargo.toml` carried a `[patch]` to a sibling
+  `../mkfs.dos.rs` checkout, which `cargo install` applies and cannot resolve
+  (#4). `mkfs-dos` is now taken by git pinned to commit `a55c537` (the
+  mkfs.dos.rs `v0.1.0` tag's commit) with no `[patch]`, which also fixes
+  `sc-build` (#2, decided in #3).
+
+### Documentation
+- README refreshed from the code: taking the crate by git tag, installing the
+  binary from `v0.1.1`, the full `Volume` API with `Entry`, `Stat` and the
+  crate-root re-exports, the CLI command reference, and what `cargo test` and
+  `verify-on-linux.sh` each need. It states that no container, service, port or
+  configuration file exists, that `append` rewrites the whole file, and that the
+  kernel check last passed on 2026-08-19 and is not run by `sc-build` (#1).
+- The attribute-string comment in the binary is corrected (`drhsa`).
+
 ## [v0.1.0] — 2026-08-19
 
 First working release. Files written here are read back byte for byte by a real
@@ -39,37 +60,3 @@ Linux kernel, and files the kernel writes are read back here.
 
 ## [Unreleased]
 <!-- New unreleased changes go here -->
-
-### 2026-10-06
-- **docs:** The README installs the binary with `--tag v0.1.1` and takes the
-  library by `tag = "v0.1.1"`. `v0.1.0` still cannot be installed with
-  `cargo install`, because of its `[patch]` (#4).
-
-### 2026-09-27
-- **docs:** Refresh the README from the code. It now covers taking the crate by
-  git tag, installing the binary, the full `Volume` API, the CLI command
-  reference, and what `cargo test` and `verify-on-linux.sh` each need. It also
-  states that no container, service, port or configuration file exists. The
-  `build:` entry that sat under Unreleased moved into v0.1.0, since the tag
-  includes it. The attribute-string comment in the binary is corrected
-  (`drhsa`). Filed #1: the kernel verification needs root ssh, so it cannot run
-  under `sc-build` or the test standard.
-- **docs:** Record that `sc-build` fails because the build box has no `../mkfs.dos.rs`
-  for the `[patch]` to point at (#2).
-- **docs:** Re-check the README against the code. `append` rewrites the whole
-  file, `verify-on-linux.sh` defaults to `root@dev.g8.lo`, and the pointer to
-  the kernel check now says it is under *Verified*, not below.
-- **build:** Take `mkfs-dos` by git pinned to a commit (`a55c537`, the `v0.1.0`
-  tag's commit), and drop the `[patch]` to `../mkfs.dos.rs`. `sc-build` has no
-  sibling checkout, so the patch broke every build. Decided in #3, fixes #2.
-  CLAUDE.md's dependency section and the README say the same.
-- **docs:** Re-check the docs against the code since 2026-09-18. The README's
-  `cargo install --tag v0.1.0` cannot work, because that tag still carries the
-  `[patch]` to `../mkfs.dos.rs`. Filed #4 to cut `v0.1.1`. Until then the
-  README installs from `--rev e559711`. The README also now describes `Entry`,
-  `Stat` and the crate-root re-exports, and says that the kernel check last
-  passed on 2026-08-19 and that `sc-build` does not run it (#1).
-- **docs:** Another pass against the code. There is no code change since the
-  last refresh, and the README's API and CLI tables still match. The CLAUDE.md
-  work plan now names #4 as next, and says that the kernel check last passed
-  on 2026-08-19.

@@ -1,6 +1,6 @@
 [package]
 name = "fio-dos"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Glenn West"]
 description = "Async userspace file I/O into a FAT12/FAT16/FAT32 filesystem — read and write files with no kernel, no mount and no loop device"

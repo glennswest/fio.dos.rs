@@ -4,7 +4,7 @@ Async userspace file I/O into a FAT12/FAT16/FAT32 filesystem. No kernel, no
 mount, no loop device.
 
 - **Crate:** `fio-dos` (lib `fio_dos`)
-- **Version:** 0.1.0 — `Cargo.toml` is the single version location
+- **Version:** 0.1.1 — `Cargo.toml` is the version location (`Cargo.lock` follows it)
 - **Licence:** MIT OR Apache-2.0
 - **Repo:** https://github.com/glennswest/fio.dos.rs
 - **Sibling:** `../mkfs.dos.rs` provides the on-disk format, the `BlockDevice`
