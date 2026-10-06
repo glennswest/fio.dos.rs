@@ -82,7 +82,20 @@ loop-mount host, so sessions cannot run it. See #1.
 - [x] Docs refreshed from the code (2026-09-27)
 - [x] #3/#2 — mkfs-dos pinned to commit a55c537 with no `[patch]`. sc-build
       passes (2026-09-27).
-- [ ] #1 — kernel verification as a `fio-dos-test` container, with no root ssh
+- [ ] #1 — kernel verification as a `test/` container, with no root ssh.
+      IN PROGRESS (2026-10-06). `stormcentral test run fio.dos.rs <suite>`,
+      image `test-fio-dos-rs-<suite>`. `test/build.sh` stages static musl
+      `fio-dos`, examples `fill`/`verify`, and the pinned `fsck-fat`;
+      `test/Containerfile` is fedora-minimal + dosfstools + util-linux;
+      `/test` (`test/test.sh`) runs what `verify-on-linux.sh` ran, inside the
+      pod: fill, fsck.fat, loop-mount, the kernel reads every file
+      (`verify --dir`), the kernel writes, fsck.fat, we read it back. JSON
+      lines out. `requires.toml`: privileged. No loop device or no vfat:
+      skip, never pass. short = the three widths; medium adds a second round
+      (we rename/remove/add after the kernel, the kernel mounts again);
+      long adds a 2 GiB FAT32 with a 200 MiB file.
+      `verify-on-linux.sh` stays for manual use but takes the host as a
+      required argument, no root default.
 - [x] #4 — `v0.1.1` cut from `main` (2026-10-06). sc-build of
       `cargo install --git … --tag v0.1.1` installs and runs `fio-dos 0.1.1`;
       the same against `v0.1.0` still fails on the `[patch]`, as expected.
