@@ -89,7 +89,7 @@ same check by hand, and needs root on that host.
 - [ ] #1 — kernel verification as a `test/` container, with no root ssh.
       IN PROGRESS (2026-10-06). `stormcentral test run fio.dos.rs <suite>`,
       image `test-fio-dos-rs-<suite>`. `test/build.sh` stages static musl
-      `fio-dos`, examples `fill`/`verify`, and the pinned `fsck-fat`;
+      `fio-dos`, examples `fill`/`verify`/`fsck` (the pinned checker);
       `test/Containerfile` is fedora-minimal + dosfstools + util-linux;
       `/test` (`test/test.sh`) runs what `verify-on-linux.sh` ran, inside the
       pod: fill, fsck.fat, loop-mount, the kernel reads every file

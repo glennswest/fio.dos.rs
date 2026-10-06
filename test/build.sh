@@ -7,10 +7,9 @@
 # the build box, and stages static binaries in test/.stage/;
 # test/Containerfile (context: the repo root) packages them.
 #
-# fsck-fat is built from this crate's own dependency graph, so it is exactly
-# the mkfs-dos commit Cargo.toml pins. Its `cli` feature pulls crates this
-# crate's Cargo.lock does not list, so that one build is not --locked; the
-# mkfs-dos rev is fixed either way.
+# fsck-fat is examples/fsck.rs: the checker from the mkfs-dos commit
+# Cargo.toml pins, built as part of this crate (mkfs-dos's own fsck-fat binary
+# sits behind a feature a dependency's build cannot be given).
 # With STAGE_ONLY=1 it stops after staging and prints the stage path;
 # otherwise it also runs `podman build` and tags fio-dos-test.
 set -eu
@@ -20,16 +19,15 @@ commit=$(git -C "$root" rev-parse HEAD)
 manifest="$root/Cargo.toml"
 
 cargo build --release --locked --target "$target" --manifest-path "$manifest" \
-    --bin fio-dos --example fill --example verify
-cargo build --release --target "$target" --manifest-path "$manifest" \
-    -p mkfs-dos --features mkfs-dos/cli --bin fsck-fat
+    --bin fio-dos --example fill --example verify --example fsck
 tdir=$(cargo metadata --format-version 1 --no-deps --manifest-path "$manifest" |
     sed 's/.*"target_directory":"\([^"]*\)".*/\1/')
 out="$tdir/$target/release"
 stage="$root/test/.stage"
 rm -rf "$stage"
 mkdir -p "$stage"
-cp "$out/fio-dos" "$out/fsck-fat" "$out/examples/fill" "$out/examples/verify" "$stage/"
+cp "$out/fio-dos" "$out/examples/fill" "$out/examples/verify" "$stage/"
+cp "$out/examples/fsck" "$stage/fsck-fat"
 cp "$root/test/test.sh" "$stage/test"
 chmod 755 "$stage/test"
 

@@ -174,7 +174,7 @@ stormcentral test run fio.dos.rs long     # and a 2 GiB FAT32 with a 200 MiB fil
 ```
 
 The judges are the node's kernel, `fsck.fat -n` from dosfstools, and
-`mkfs-dos`'s own `fsck-fat`. A node without a loop device or without vfat
+`mkfs-dos`'s own checker (`examples/fsck`, staged as `fsck-fat`). A node without a loop device or without vfat
 reports the kernel checks as skip and the run as "could not run" (exit 2),
 never as a pass.
 
@@ -189,8 +189,8 @@ and FAT32 images it creates in temporary files. Every test ends with a check by
 crate. It needs no root and no kernel.
 
 `test/` is the kernel check described under *Verified*: `test/build.sh`
-stages static `fio-dos`, the `fill` and `verify` examples and the pinned
-`fsck-fat`, `test/Containerfile` packages them on fedora-minimal with dosfstools
+stages static `fio-dos`, the `fill`, `verify` and `fsck` examples (the last over the pinned
+mkfs-dos checker, staged as `fsck-fat`), `test/Containerfile` packages them on fedora-minimal with dosfstools
 and util-linux, and `/test <suite>` (`test/test.sh`) prints one JSON line per
 check. It needs root only inside its own pod, never a login.
 

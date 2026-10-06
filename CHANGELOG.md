@@ -13,7 +13,9 @@
   a 200 MiB file. No loop device or no vfat: skip, and exit 2.
 - **feat:** `examples/verify --dir <mountpoint> <manifest>` reads the files
   from a directory (the kernel's mount) instead of the image; `examples/fill`
-  takes an optional fourth argument, the MiB of an extra `/big.bin`.
+  takes an optional fourth argument, the MiB of an extra `/big.bin`; new
+  `examples/fsck <image>` checks an image read-only with the pinned
+  `mkfs_dos::fsck` and prints what mkfs-dos's `fsck-fat` prints.
 - **chore:** `tests/verify-on-linux.sh` takes the host as a required argument;
   it no longer defaults to a root login.
 - **docs:** README *Verified* and *Testing*, and CLAUDE.md, describe the test
