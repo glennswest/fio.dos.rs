@@ -150,21 +150,33 @@ trusting the fragments would give it a name it no longer has.
 
 ## Verified
 
-`./tests/verify-on-linux.sh` writes an image here with no kernel involved, ships
-it to a Linux host, and has the kernel's own FAT driver read **every file back
-byte for byte** — 310 files per image, sizes from 0 bytes to 300 KB, long names,
-Unicode names, nested directories and a directory grown past a cluster. Then the
-kernel writes to the image, and the result is read back here and compared again.
-
-Both directions passed on FAT12, FAT16 and FAT32 when `v0.1.0` was cut
-(2026-08-19). That is the last recorded run. The check needs root on a
-loop-mount host, and nothing in `sc-build` runs it (#1).
+The kernel check writes an image here with no kernel involved, then has the
+kernel's own FAT driver read **every file back byte for byte** — 310 files per
+image, sizes from 0 bytes to 300 KB, long names, Unicode names, nested
+directories and a directory grown past a cluster. Then the kernel writes to the
+image, and the result is read back here and compared again.
 
 ```
-fill (no kernel) -> fsck.fat -> mount -> kernel reads all 310 files
-  -> kernel writes 700 KiB and a long-named directory -> unmount -> fsck.fat
-  -> read back here -> our fsck.fat
+fill (no kernel) -> fsck.fat, fsck-fat -> loop-mount -> kernel reads all 310 files
+  -> kernel writes 700 KiB and a long-named directory -> unmount
+  -> fsck.fat, fsck-fat -> read back here, every file and the kernel's
 ```
+
+It runs as this crate's test container (`test/`, per the stormcos test
+standard), on a test machine, in a privileged pod:
+
+```sh
+stormcentral test run fio.dos.rs short    # FAT12, FAT16, FAT32, both directions
+stormcentral test run fio.dos.rs medium   # and a second round on each: we rename,
+                                          # remove and add after the kernel wrote,
+                                          # and the kernel mounts it again
+stormcentral test run fio.dos.rs long     # and a 2 GiB FAT32 with a 200 MiB file
+```
+
+The judges are the node's kernel, `fsck.fat -n` from dosfstools, and
+`mkfs-dos`'s own `fsck-fat`. A node without a loop device or without vfat
+reports the kernel checks as skip and the run as "could not run" (exit 2),
+never as a pass.
 
 "We can read our own files" and "the filesystem is right" are different claims.
 The kernel settles the second.
@@ -176,11 +188,16 @@ and FAT32 images it creates in temporary files. Every test ends with a check by
 `mkfs_dos::fsck`, the Rust reimplementation of `fsck.fat` in the companion
 crate. It needs no root and no kernel.
 
-`tests/verify-on-linux.sh [user@host]` is the kernel check described under
-*Verified*. The host defaults to `root@dev.g8.lo`. It needs a Linux host where it can loop-mount an image, which means root there, plus
-`fsck.fat` and `python3` on that host. It also expects the
-`mkfs.dos.rs` checkout next to this one, because it uses that crate's `fsck-fat`
-binary.
+`test/` is the kernel check described under *Verified*: `test/build.sh`
+stages static `fio-dos`, the `fill` and `verify` examples and the pinned
+`fsck-fat`, `test/Containerfile` packages them on fedora-minimal with dosfstools
+and util-linux, and `/test <suite>` (`test/test.sh`) prints one JSON line per
+check. It needs root only inside its own pod, never a login.
+
+`tests/verify-on-linux.sh user@host` is the same check by hand, over ssh. It
+needs a host where that login can loop-mount (root, in practice) with `fsck.fat`
+and `python3`, builds where it runs, and expects the `mkfs.dos.rs` checkout next
+to this one for `fsck-fat`.
 
 ## What FAT does not have
 

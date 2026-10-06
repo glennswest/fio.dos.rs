@@ -37,8 +37,11 @@ A library crate plus the `fio-dos` binary (behind the default `cli` feature).
 Consumers take it by git tag. There is no crates.io release, container image,
 service, port or configuration file. It is not a stormcentral component with a
 golden. Build and test with `sc-build` (`cargo build && cargo test`). The
-round-trip suite needs no root. `tests/verify-on-linux.sh` needs root on a
-loop-mount host, so sessions cannot run it. See #1.
+round-trip suite needs no root. The kernel check is the test container in
+`test/` (#1): `stormcentral test run fio.dos.rs short|medium|long --url
+http://stormcentral.g8.lo` builds it on the build box and runs it as a
+privileged Job on a test machine. `tests/verify-on-linux.sh user@host` is the
+same check by hand, and needs root on that host.
 
 ## Shape
 
@@ -63,8 +66,9 @@ loop-mount host, so sessions cannot run it. See #1.
    clusters, which is precisely the "lost clusters" `fsck.fat` reports.
 5. **Every test ends by checking the filesystem.** A writer that leaves
    `fsck.fat` complaining has damaged the filesystem, not written a file.
-6. **The kernel is the judge.** `tests/verify-on-linux.sh` is the test that
-   counts, and it runs in both directions. Sessions cannot run it yet (#1).
+6. **The kernel is the judge.** The test container in `test/` is the test
+   that counts, and it runs in both directions:
+   `stormcentral test run fio.dos.rs short` (#1).
 
 ## Work plan
 

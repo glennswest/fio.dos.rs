@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+### 2026-10-06
+- **test:** The kernel check runs as a test container (`test/`, the stormcos
+  test standard), with no root login and no build where it runs (#1).
+  `/test short|medium|long` writes FAT12/FAT16/FAT32 images with no kernel,
+  loop-mounts them in a privileged pod, has the kernel read every file and
+  write its own, and reads that back here; `fsck.fat -n` and `fsck-fat` judge
+  before and after. `medium` adds a second round in which we change what the
+  kernel wrote and the kernel mounts it again; `long` adds a 2 GiB FAT32 with
+  a 200 MiB file. No loop device or no vfat: skip, and exit 2.
+- **feat:** `examples/verify --dir <mountpoint> <manifest>` reads the files
+  from a directory (the kernel's mount) instead of the image; `examples/fill`
+  takes an optional fourth argument, the MiB of an extra `/big.bin`.
+- **chore:** `tests/verify-on-linux.sh` takes the host as a required argument;
+  it no longer defaults to a root login.
+- **docs:** README *Verified* and *Testing*, and CLAUDE.md, describe the test
+  container.
+
 ## [v0.1.1] — 2026-10-06
 
 A packaging fix. The library and the binary behave exactly as in v0.1.0.

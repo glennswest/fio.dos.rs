@@ -1,0 +1,16 @@
+# fio-dos-test — fio-dos's test image, per stormcentral
+# docs/test-standard.md. One image for all three suites: the Job runs
+# `/test short|medium|long`.
+#
+# The question it answers is CLAUDE.md rule 6's: does a real kernel see what
+# fio-dos wrote, and do we see what the kernel wrote? test/build.sh stages
+# static fio-dos, fill, verify and fsck-fat; this adds what the judging needs —
+# fsck.fat (dosfstools), losetup and mount (util-linux) — which is why it is
+# fedora-minimal and not scratch.
+FROM registry.fedoraproject.org/fedora-minimal:43
+ARG COMMIT=unknown
+LABEL storm.io/test-of="fio.dos.rs" storm.io/test-commit="${COMMIT}"
+RUN microdnf -y install --setopt=install_weak_deps=0 dosfstools util-linux coreutils diffutils && microdnf clean all
+COPY test/.stage/fio-dos test/.stage/fsck-fat test/.stage/fill test/.stage/verify /usr/local/bin/
+COPY test/.stage/test /test
+ENTRYPOINT ["/test"]

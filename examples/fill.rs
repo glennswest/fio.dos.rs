@@ -6,6 +6,7 @@
 //!
 //! ```sh
 //! cargo run --example fill -- out.img 64 fat16
+//! cargo run --example fill -- out.img 2048 fat32 200   # and a 200 MiB /big.bin
 //! ```
 //!
 //! Each file's contents are generated from its index, so the far side can
@@ -24,13 +25,14 @@ fn contents(index: usize, size: usize) -> Vec<u8> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let path = args.next().ok_or("usage: fill <path> <size-mib> [fat12|fat16|fat32]")?;
+    let path = args.next().ok_or("usage: fill <path> <size-mib> [fat12|fat16|fat32] [big-file-mib]")?;
     let size_mib: u64 = args.next().ok_or("missing size in MiB")?.parse()?;
 
     let mut params = Params::new().invariant().label("FIOTEST");
     if let Some(width) = args.next() {
         params.fat_type = Some(width.parse::<FatType>()?);
     }
+    let big_mib: usize = args.next().map(|s| s.parse()).transpose()?.unwrap_or(0);
 
     let device = FileDevice::create(&path, size_mib * 1024 * 1024).await?;
     let report = format(&device, &params).await?;
@@ -69,6 +71,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let index = 100 + i;
         vol.write(&name, &contents(index, 200)).await?;
         println!("{index}\t200\t{name}");
+    }
+
+    // One file whose chain crosses most of the FAT, when asked for.
+    if big_mib > 0 {
+        let (index, size) = (999, big_mib * 1024 * 1024);
+        vol.write("/big.bin", &contents(index, size)).await?;
+        println!("{index}\t{size}\t/big.bin");
     }
 
     vol.flush().await?;

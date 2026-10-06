@@ -1,0 +1,15 @@
+# What fio-dos-test needs beyond the runner's namespace-only Role
+# (stormcentral docs/test-standard.md). Writing the image needs nothing; the
+# judging does: a loop device and a vfat mount, so the pod is privileged. On
+# a node whose kernel has no loop driver or no vfat, the kernel checks report
+# skip, never pass, and the run exits 2. No hardware is assumed: images are
+# sparse files in the pod's own temp directory (short and medium 8 + 64 +
+# 512 MiB, long adds one of 2 GiB holding a 200 MiB file).
+[short]
+privileged = true
+
+[medium]
+privileged = true
+
+[long]
+privileged = true

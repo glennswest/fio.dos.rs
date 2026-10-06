@@ -10,13 +10,15 @@
 # Both directions matter. "We can read our own files" and "the filesystem is
 # right" are different claims.
 #
-#   ./tests/verify-on-linux.sh [user@host]
+#   ./tests/verify-on-linux.sh user@host
 #
-# Defaults to root@dev.g8.lo.
+# For manual use only. It needs a host where it can loop-mount, which means
+# root there, and it builds where it runs. The same check runs with neither as
+# the test container: `stormcentral test run fio.dos.rs short` (test/, #1).
 
 set -uo pipefail
 
-HOST="${1:-root@dev.g8.lo}"
+HOST="${1:?usage: $0 user@host — a Linux host where the login may loop-mount}"
 REMOTE_DIR=/root/fio-dos-verify
 FAILURES=0
 

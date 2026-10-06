@@ -6,7 +6,12 @@
 //!
 //! ```sh
 //! cargo run --example verify -- out.img manifest.tsv
+//! cargo run --example verify -- --dir /mnt/fat manifest.tsv
 //! ```
+//!
+//! With `--dir`, the files are read from a directory instead — the mount point
+//! of the same image — so this is also how the kernel's side is judged: the
+//! kernel's FAT driver reads every file and the bytes are compared here.
 
 use fio_dos::mkfs_dos::device::FileDevice;
 use fio_dos::Volume;
@@ -18,11 +23,19 @@ fn contents(index: usize, size: usize) -> Vec<u8> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let image = args.next().ok_or("usage: verify <image> <manifest>")?;
+    let usage = "usage: verify <image> <manifest> | verify --dir <mountpoint> <manifest>";
+    let mut first = args.next().ok_or(usage)?;
+    let dir = first == "--dir";
+    if dir {
+        first = args.next().ok_or(usage)?;
+    }
     let manifest = args.next().ok_or("missing manifest")?;
 
-    let device = FileDevice::open(&image).await?;
-    let vol = Volume::open(device).await?;
+    let vol = if dir {
+        None
+    } else {
+        Some(Volume::open(FileDevice::open(&first).await?).await?)
+    };
 
     let manifest = std::fs::read_to_string(manifest)?;
     let mut checked = 0;
@@ -34,7 +47,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let size: usize = fields.next().ok_or("bad manifest line")?.parse()?;
         let path = fields.next().ok_or("bad manifest line")?;
 
-        match vol.read(path).await {
+        let read = match &vol {
+            Some(vol) => vol.read(path).await.map_err(|e| e.to_string()),
+            None => std::fs::read(format!("{first}{path}")).map_err(|e| e.to_string()),
+        };
+        match read {
             Ok(data) if data == contents(index, size) => checked += 1,
             Ok(data) => {
                 failures += 1;

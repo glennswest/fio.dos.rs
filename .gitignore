@@ -30,3 +30,4 @@ temp/
 *.img
 *.img.*
 !tests/golden/*.img.gz
+test/.stage/
