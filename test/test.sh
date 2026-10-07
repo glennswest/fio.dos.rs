@@ -83,6 +83,8 @@ check() {
 attach() {
     local d n
     d=$(losetup -f) || return 1
+    # With no node for it here, losetup names it "/dev/loopN (lost)".
+    d=${d%% *}
     n=${d#/dev/loop}
     [ -b "$d" ] || mknod "$d" b 7 "$n" || return 1
     losetup "$d" "$1" || return 1
