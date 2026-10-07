@@ -178,6 +178,13 @@ The judges are the node's kernel, `fsck.fat -n` from dosfstools, and
 reports the kernel checks as skip and the run as "could not run" (exit 2),
 never as a pass.
 
+Last kernel passes: by hand with `verify-on-linux.sh` when `v0.1.0` was cut
+(2026-08-19); in the container on test machine pvetest2 (kernel 7.2.8) on
+2026-10-07, run `99e14c33ed`, where every kernel check passed on all three
+widths in both directions. That run is recorded as an error, not a pass: its
+JSON lines had spaces, which the kubelet log mangles (fixed since). A run
+recorded as passed is still to come (#1).
+
 "We can read our own files" and "the filesystem is right" are different claims.
 The kernel settles the second.
 

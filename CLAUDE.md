@@ -100,6 +100,19 @@ same check by hand, and needs root on that host.
       long adds a 2 GiB FAT32 with a 200 MiB file.
       `verify-on-linux.sh` stays for manual use but takes the host as a
       required argument, no root default.
+      State (2026-10-07): done and pushed (4da20ab). sc-build passes;
+      test/build.sh stages static binaries on the build box, and the
+      unprivileged dry run takes the skip path with exit 2. Run 99e14c33ed
+      (short, pvetest2, 7074bda): every kernel check passed, but the runner
+      recorded no results, because rustkube-node#136 mangles lines with
+      spaces (fixed in a2d2e16, so `·` is used). Run 90cf1bd754 (a2d2e16):
+      results parsed, but it skipped because `losetup -f` says
+      "/dev/loop0 (lost)" when the pod has no node for it (fixed in 4da20ab).
+      Every run since errors on the test-image build: dev.g8.lo is retired
+      (stormcentral#521) and the runner still sends to it, stormcentral#526.
+      Proposed --after stormcentral#526. Next: `stormcentral test run
+      fio.dos.rs short|medium --tag <machine>` at 4da20ab or later; on a
+      recorded pass, close #1.
 - [x] #4 — `v0.1.1` cut from `main` (2026-10-06). sc-build of
       `cargo install --git … --tag v0.1.1` installs and runs `fio-dos 0.1.1`;
       the same against `v0.1.0` still fails on the `[patch]`, as expected.
