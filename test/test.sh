@@ -21,7 +21,9 @@
 # never pass, and the run exits 2 (could not run).
 #
 # stdout is one JSON object per line per check and a final summary; the
-# commands' own output goes to stderr.
+# commands' own output goes to stderr. The lines carry no spaces (`·` in the
+# strings): the node's kubelet log drops the first three words of a line with
+# three or more spaces (rustkube-node#136), and the runner would lose them.
 
 set -uo pipefail
 
@@ -51,12 +53,13 @@ json_str() {
     local s="$1"
     s="${s//\\/\\\\}"; s="${s//\"/\\\"}"
     s="${s//$'\n'/ | }"; s="${s//$'\t'/ }"; s="${s//$'\r'/}"
+    s="${s// /·}"
     printf '"%s"' "$s"
 }
 report() { # test status started-ms detail
     local ms=$(( $(now_ms) - $3 ))
     case "$2" in pass) PASS=$((PASS+1)) ;; fail) FAIL=$((FAIL+1)) ;; skip) SKIP=$((SKIP+1)) ;; esac
-    printf '{"test": %s, "status": "%s", "ms": %d, "detail": %s}\n' \
+    printf '{"test":%s,"status":"%s","ms":%d,"detail":%s}\n' \
         "$(json_str "$1")" "$2" "$ms" "$(json_str "${4:-}")"
 }
 # check name detail-on-pass command... — pass when the command succeeds; on
@@ -247,7 +250,7 @@ run_case fat32 512 fat32
 [ "$SUITE" = long ] && run_case fat32-big 2048 fat32 200
 rm -f "$WORK"/*.img
 
-printf '{"summary": {"pass": %d, "fail": %d, "skip": %d}}\n' "$PASS" "$FAIL" "$SKIP"
+printf '{"summary":{"pass":%d,"fail":%d,"skip":%d}}\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -gt 0 ] && exit 1
 # Without the kernel's side nothing was judged: that is "could not run".
 [ "$KERNEL_RAN" = 1 ] || exit 2

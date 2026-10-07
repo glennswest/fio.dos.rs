@@ -10,7 +10,9 @@
   write its own, and reads that back here; `fsck.fat -n` and `fsck-fat` judge
   before and after. `medium` adds a second round in which we change what the
   kernel wrote and the kernel mounts it again; `long` adds a 2 GiB FAT32 with
-  a 200 MiB file. No loop device or no vfat: skip, and exit 2.
+  a 200 MiB file. No loop device or no vfat: skip, and exit 2. The JSON lines
+  carry no spaces (`·` in strings), since the kubelet log drops the first
+  three words of a line with three or more (rustkube-node#136).
 - **feat:** `examples/verify --dir <mountpoint> <manifest>` reads the files
   from a directory (the kernel's mount) instead of the image; `examples/fill`
   takes an optional fourth argument, the MiB of an extra `/big.bin`; new
