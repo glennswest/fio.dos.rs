@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### 2026-10-10
+- **docs:** Refreshed from the code. README: the CLI's `--long` and
+  `--recursive` spellings; `/test`'s exit codes (0 pass, 1 fail, 2 could not
+  run), its `$STORM_SUITE` default and cleanup; `build.sh` only stages and the
+  runner builds the image; the `fill`, `verify` and `fsck` examples' arguments;
+  no run recorded as passed yet, blocked on stormcentral#526. README and
+  CLAUDE.md now record the owner's ruling on #1 (2026-10-06): the kernel check
+  belongs in a throwaway VM booted with `stormcentral testhost boot`, which is
+  not built yet; the privileged pod in `test/` is what exists today. Filed #5:
+  the build does not fail on warnings.
+
+### 2026-10-07
+- **fix(test):** `test/build.sh` only stages binaries in `test/.stage/`; the
+  runner builds the image from `test/Containerfile` with no container runtime
+  (stormcentral#121).
+- **fix(test):** `losetup -f` names a loop device the pod has no node for as
+  `/dev/loopN (lost)`; `/test` strips that and makes the node with `mknod`
+  (privileged pods may), instead of reporting no loop device.
+
 ### 2026-10-06
 - **test:** The kernel check runs as a test container (`test/`, the stormcos
   test standard), with no root login and no build where it runs (#1).

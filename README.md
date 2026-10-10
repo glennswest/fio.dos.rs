@@ -118,13 +118,13 @@ fio-dos <image> <command>
 
 | Command | Does |
 |---|---|
-| `ls [path] [-l]` | list a directory (default `/`). `-l` adds attributes (`drhsa`), size, short name and modification time |
+| `ls [path] [-l\|--long]` | list a directory (default `/`). `-l` adds attributes (`drhsa`), size, short name and modification time |
 | `tree [path]` | list everything under a directory, with sizes |
 | `cat <path>` | write a file to stdout |
 | `put <host-file> <path>` | copy a file into the image |
 | `get <path> <host-file>` | copy a file out of the image |
 | `mkdir <path>` | create a directory and any parents it needs |
-| `rm <path> [-r]` | remove a file, or with `-r` a directory and everything in it |
+| `rm <path> [-r\|--recursive]` | remove a file, or with `-r` a directory and everything in it |
 | `rmdir <path>` | remove an empty directory |
 | `mv <from> <to>` | rename or move |
 | `label [new]` | print the volume label, or set it |
@@ -162,7 +162,7 @@ fill (no kernel) -> fsck.fat, fsck-fat -> loop-mount -> kernel reads all 310 fil
   -> fsck.fat, fsck-fat -> read back here, every file and the kernel's
 ```
 
-It runs as this crate's test container (`test/`, per the stormcos test
+Today it runs as this crate's test container (`test/`, per the stormcos test
 standard), on a test machine, in a privileged pod:
 
 ```sh
@@ -174,16 +174,30 @@ stormcentral test run fio.dos.rs long     # and a 2 GiB FAT32 with a 200 MiB fil
 ```
 
 The judges are the node's kernel, `fsck.fat -n` from dosfstools, and
-`mkfs-dos`'s own checker (`examples/fsck`, staged as `fsck-fat`). A node without a loop device or without vfat
-reports the kernel checks as skip and the run as "could not run" (exit 2),
-never as a pass.
+`mkfs-dos`'s own checker (`examples/fsck`, staged as `fsck-fat`). `/test`
+prints one JSON line per check and a summary line, and exits 0 on a pass, 1 on
+any failure, and 2 ("could not run") when the kernel judged nothing — a node
+without a loop device or without vfat reports the kernel checks as skip, never
+as a pass. Images are sparse files in the pod's temp directory; every loop
+device and mount is undone on exit.
+
+**The privileged pod is not where this check is meant to end up.** The owner
+ruled on 2026-10-06 (#1) that the kernel verification runs in a throwaway VM
+booted by stormcentral (`stormcentral testhost boot`): a small kernel+busybox
+image, built by `sc-build`, whose init runs the same sequence — fill,
+`fsck.fat -n`, loop-mount, the kernel reads and writes, `fsck.fat -n`, we read
+it back — and prints `VERIFY PASS` or `VERIFY FAIL <why>` on serial. That
+image does not exist yet; `test/` is the pod form, and #1 stays open until the
+VM form replaces it.
 
 Last kernel passes: by hand with `verify-on-linux.sh` when `v0.1.0` was cut
 (2026-08-19); in the container on test machine pvetest2 (kernel 7.2.8) on
 2026-10-07, run `99e14c33ed`, where every kernel check passed on all three
 widths in both directions. That run is recorded as an error, not a pass: its
-JSON lines had spaces, which the kubelet log mangles (fixed since). A run
-recorded as passed is still to come (#1).
+JSON lines had spaces, which the kubelet log mangles (fixed since). No run has
+been recorded as passed: every run since errors before it starts, because the
+runner still sends the test-image build to the retired dev.g8.lo
+(stormcentral#526).
 
 "We can read our own files" and "the filesystem is right" are different claims.
 The kernel settles the second.
@@ -198,8 +212,14 @@ crate. It needs no root and no kernel.
 `test/` is the kernel check described under *Verified*: `test/build.sh`
 stages static `fio-dos`, the `fill`, `verify` and `fsck` examples (the last over the pinned
 mkfs-dos checker, staged as `fsck-fat`), `test/Containerfile` packages them on fedora-minimal with dosfstools
-and util-linux, and `/test <suite>` (`test/test.sh`) prints one JSON line per
-check. It needs root only inside its own pod, never a login.
+and util-linux, and `/test <suite>` (`test/test.sh`; the suite defaults to
+`$STORM_SUITE`, then `short`) prints one JSON line per check. `build.sh` only
+stages the binaries in `test/.stage/`; the runner builds the image from the
+`Containerfile` itself. It needs root only inside its own pod, never a login.
+The examples run on their own too: `fill <image> <size-mib> [fat12|fat16|fat32]
+[big-file-mib]` writes an image and prints its manifest, `verify <image>
+<manifest>` (or `verify --dir <mountpoint> <manifest>`) checks every file, and
+`fsck <image>` checks the filesystem read-only.
 
 `tests/verify-on-linux.sh user@host` is the same check by hand, over ssh. It
 needs a host where that login can loop-mount (root, in practice) with `fsck.fat`

@@ -37,11 +37,17 @@ A library crate plus the `fio-dos` binary (behind the default `cli` feature).
 Consumers take it by git tag. There is no crates.io release, container image,
 service, port or configuration file. It is not a stormcentral component with a
 golden. Build and test with `sc-build` (`cargo build && cargo test`). The
-round-trip suite needs no root. The kernel check is the test container in
-`test/` (#1): `stormcentral test run fio.dos.rs short|medium|long --url
+round-trip suite needs no root. The kernel check today is the test container
+in `test/` (#1): `stormcentral test run fio.dos.rs short|medium|long --url
 http://stormcentral.g8.lo` builds it on the build box and runs it as a
-privileged Job on a test machine. `tests/verify-on-linux.sh user@host` is the
-same check by hand, and needs root on that host.
+privileged Job on a test machine. **The owner ruled (2026-10-06, #1) that the
+kernel check runs in a throwaway VM instead**, via `stormcentral testhost
+boot`: a kernel+busybox image built by `sc-build` (`SC_BUILD_OUT`) whose init
+runs fill → `fsck.fat -n` → loop-mount → the kernel reads and writes →
+`fsck.fat -n` → we read back, and prints `VERIFY PASS` / `VERIFY FAIL <why>`
+on serial. That image is not built yet; the pod form is what exists.
+`tests/verify-on-linux.sh user@host` is the same check by hand, and needs root
+on that host. The build does not yet fail on warnings (#5).
 
 ## Shape
 
@@ -66,9 +72,10 @@ same check by hand, and needs root on that host.
    clusters, which is precisely the "lost clusters" `fsck.fat` reports.
 5. **Every test ends by checking the filesystem.** A writer that leaves
    `fsck.fat` complaining has damaged the filesystem, not written a file.
-6. **The kernel is the judge.** The test container in `test/` is the test
-   that counts, and it runs in both directions:
-   `stormcentral test run fio.dos.rs short` (#1).
+6. **The kernel is the judge.** The kernel check is the test that counts, and
+   it runs in both directions. Today that is the `test/` container
+   (`stormcentral test run fio.dos.rs short`); by the owner's ruling on #1 it
+   moves to a throwaway VM booted with `stormcentral testhost boot`.
 
 ## Work plan
 
@@ -111,10 +118,23 @@ same check by hand, and needs root on that host.
       Every run since errors on the test-image build: dev.g8.lo is retired
       (stormcentral#521) and the runner still sends to it, stormcentral#526.
       Proposed --after stormcentral#526. Next: `stormcentral test run
-      fio.dos.rs short|medium --tag <machine>` at 4da20ab or later; on a
-      recorded pass, close #1.
+      fio.dos.rs short|medium --tag <machine>` at 4da20ab or later.
+      NOT DONE BY THIS: the owner ruled on 2026-10-06 (#1, before the pod
+      work was pushed) that the kernel check runs in a throwaway VM via
+      `stormcentral testhost boot nanatest1 --image F --expect "VERIFY
+      PASS" --fail "VERIFY FAIL" --project fio.dos.rs`, not in a privileged
+      pod. Still to do: a kernel+busybox image (SC_BUILD_OUT) carrying
+      fio-dos/fill/verify/fsck-fat and dosfstools, whose init runs the
+      test.sh sequence and prints VERIFY PASS/FAIL on serial; the boot
+      machine must list fio.dos.rs (stormcentral#478). #1 closes on a
+      VERIFY PASS from that, then `test/` is retired or kept as the pod
+      form if the owner wants it.
 - [x] #4 — `v0.1.1` cut from `main` (2026-10-06). sc-build of
       `cargo install --git … --tag v0.1.1` installs and runs `fio-dos 0.1.1`;
       the same against `v0.1.0` still fails on the `[patch]`, as expected.
       Nothing in progress. Next: #1, then the open items above.
 - [x] Docs re-checked against the code; README install line and #4 (2026-09-27)
+- [x] Docs refreshed from the code since 2026-10-02 (2026-10-10): CLI long
+      flags, `/test` exit codes and `$STORM_SUITE`, the examples' arguments,
+      the owner's VM ruling on #1, stormcentral#526 as the blocker.
+- [ ] #5 — make warnings fail the build (`[lints.rust]`, clippy -D warnings).
