@@ -88,7 +88,7 @@ addmod nls_utf8
 printf '%s\n' "${ORDER[@]:-}" > "$ROOT/modules.order"
 echo "== modules: ${ORDER[*]:-(all built in)}"
 mkdos_rev=$(sed -n '/^name = "mkfs-dos"$/,/^$/s/^source = "git+.*#\(.*\)"$/\1/p' "$REPO/Cargo.lock")
-echo "fio.dos.rs $(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo '?'), mkfs-dos ${mkdos_rev:0:7}, $(fsck.fat --help 2>&1 | awk 'NR==1')" > "$ROOT/build-info"
+echo "fio.dos.rs $(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo '?'), mkfs-dos ${mkdos_rev:0:7}, dosfstools $(rpm -q --qf '%{VERSION}' dosfstools 2>/dev/null || echo '?')" > "$ROOT/build-info"
 install -m 755 "$HERE/init.sh" "$ROOT/init"
 
 # A newc initramfs, written without root (no mknod: headers are bytes).

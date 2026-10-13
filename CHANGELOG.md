@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### 2026-10-13
+- **test:** The kernel check runs in a throwaway VM, as the owner ruled on #1:
+  `tests/vm/build-image.sh` makes a UEFI disk whose Shell starts the build
+  VM's kernel with a busybox initramfs (fsck.fat, the loop/fat/vfat/nls
+  modules, `fio-dos` and the `fill`/`verify`/`fsck` examples), and
+  `tests/vm/init.sh` runs as PID 1: FAT12, FAT16, FAT32 and a 2 GiB FAT32
+  with a 200 MiB file, written with no kernel, judged by `fsck.fat -n`,
+  `fsck-fat` and the kernel's loop mount in both directions and over a second
+  round, then `VERIFY PASS` / `VERIFY FAIL <why>` on serial. Built with
+  `sc-build` (`SC_BUILD_OUT`), booted with `stormcentral testhost boot
+  nanatest1`; run `7e583db0d4` passed. `test/` is unchanged pending #6.
+
 ### 2026-10-10
 - **docs:** Refreshed from the code. README: the CLI's `--long` and
   `--recursive` spellings; `/test`'s exit codes (0 pass, 1 fail, 2 could not

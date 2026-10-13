@@ -37,16 +37,15 @@ A library crate plus the `fio-dos` binary (behind the default `cli` feature).
 Consumers take it by git tag. There is no crates.io release, container image,
 service, port or configuration file. It is not a stormcentral component with a
 golden. Build and test with `sc-build` (`cargo build && cargo test`). The
-round-trip suite needs no root. The kernel check today is the test container
-in `test/` (#1): `stormcentral test run fio.dos.rs short|medium|long --url
-http://stormcentral.g8.lo` builds it on the build box and runs it as a
-privileged Job on a test machine. **The owner ruled (2026-10-06, #1) that the
-kernel check runs in a throwaway VM instead**, via `stormcentral testhost
-boot`: a kernel+busybox image built by `sc-build` (`SC_BUILD_OUT`) whose init
-runs fill → `fsck.fat -n` → loop-mount → the kernel reads and writes →
-`fsck.fat -n` → we read back, and prints `VERIFY PASS` / `VERIFY FAIL <why>`
-on serial. That image is not built yet; the pod form is what exists.
-`tests/verify-on-linux.sh user@host` is the same check by hand, and needs root
+round-trip suite needs no root. The kernel check is the throwaway VM the owner ruled for on
+2026-10-06 (#1): `tests/vm/build-image.sh` makes a kernel+busybox UEFI disk
+(built by `sc-build`, carried off with `SC_BUILD_OUT`) whose init runs fill →
+`fsck.fat -n` → loop-mount → the kernel reads and writes → `fsck.fat -n` → we
+read back and change it → the kernel mounts again, and prints `VERIFY PASS` /
+`VERIFY FAIL <why>` on serial; `stormcentral testhost boot nanatest1` boots it
+(README "Verified"). The `test/` container (`stormcentral test run fio.dos.rs
+short|medium|long`) runs the same sequence as a privileged Job; whether it is
+kept is #6. `tests/verify-on-linux.sh user@host` is the same check by hand, and needs root
 on that host. The build does not yet fail on warnings (#5).
 
 ## Shape
@@ -73,9 +72,8 @@ on that host. The build does not yet fail on warnings (#5).
 5. **Every test ends by checking the filesystem.** A writer that leaves
    `fsck.fat` complaining has damaged the filesystem, not written a file.
 6. **The kernel is the judge.** The kernel check is the test that counts, and
-   it runs in both directions. Today that is the `test/` container
-   (`stormcentral test run fio.dos.rs short`); by the owner's ruling on #1 it
-   moves to a throwaway VM booted with `stormcentral testhost boot`.
+   it runs in both directions: the `tests/vm/` image, booted with
+   `stormcentral testhost boot nanatest1`, as the owner ruled on #1.
 
 ## Work plan
 
@@ -93,8 +91,8 @@ on that host. The build does not yet fail on warnings (#5).
 - [x] Docs refreshed from the code (2026-09-27)
 - [x] #3/#2 — mkfs-dos pinned to commit a55c537 with no `[patch]`. sc-build
       passes (2026-09-27).
-- [ ] #1 — kernel verification as a `test/` container, with no root ssh.
-      IN PROGRESS (2026-10-06). `stormcentral test run fio.dos.rs <suite>`,
+- [x] #1 — kernel verification with no root ssh. First as a `test/`
+      container (2026-10-06), then as the owner ruled, a testhost boot VM. `stormcentral test run fio.dos.rs <suite>`,
       image `test-fio-dos-rs-<suite>`. `test/build.sh` stages static musl
       `fio-dos`, examples `fill`/`verify`/`fsck` (the pinned checker);
       `test/Containerfile` is fedora-minimal + dosfstools + util-linux;
@@ -129,19 +127,20 @@ on that host. The build does not yet fail on warnings (#5).
       machine must list fio.dos.rs (stormcentral#478). #1 closes on a
       VERIFY PASS from that, then `test/` is retired or kept as the pod
       form if the owner wants it.
-      IN PROGRESS (2026-10-13): the VM form, after fio.ext4.rs's
-      `tests/vm/` (its run 37320f36bd passed on nanatest1).
+      DONE (2026-10-13): the VM form, after fio.ext4.rs's `tests/vm/`.
       `tests/vm/build-image.sh OUT.img` makes a UEFI disk (Shell -> the
       build VM's kernel + a busybox initramfs with fsck.fat, the
       loop/fat/vfat/nls modules, fio-dos and the fill/verify/fsck
-      examples); `tests/vm/init.sh` (PID 1) runs test.sh's medium+long
-      sequence and prints VERIFY PASS/FAIL. `test/` is left as it is
-      until the owner answers #6 (options 1 and 2 both close #1 on the
-      VM pass).
+      examples); `tests/vm/init.sh` (PID 1) runs test.sh's long sequence,
+      both rounds, and prints VERIFY PASS/FAIL. Verified: image built by
+      sc-build from 6a74877 (kernel 7.2.8-200.fc44, mkfs-dos a55c537);
+      `testhost boot nanatest1` run 7e583db0d4 printed VERIFY PASS after
+      11.5 s, FAT12/FAT16/FAT32/2 GiB FAT32 all clean. `test/` is left as
+      it is until the owner answers #6.
 - [x] #4 — `v0.1.1` cut from `main` (2026-10-06). sc-build of
       `cargo install --git … --tag v0.1.1` installs and runs `fio-dos 0.1.1`;
       the same against `v0.1.0` still fails on the `[patch]`, as expected.
-      Nothing in progress. Next: #1, then the open items above.
+      Nothing in progress. Next: #5, then the open items above.
 - [x] Docs re-checked against the code; README install line and #4 (2026-09-27)
 - [x] Docs refreshed from the code since 2026-10-02 (2026-10-10): CLI long
       flags, `/test` exit codes and `$STORM_SUITE`, the examples' arguments,

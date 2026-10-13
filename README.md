@@ -162,42 +162,51 @@ fill (no kernel) -> fsck.fat, fsck-fat -> loop-mount -> kernel reads all 310 fil
   -> fsck.fat, fsck-fat -> read back here, every file and the kernel's
 ```
 
-Today it runs as this crate's test container (`test/`, per the stormcos test
-standard), on a test machine, in a privileged pod:
+It runs in a throwaway VM (`tests/vm/`), as the owner ruled on 2026-10-06
+(#1): stormcentral boots a disk image on a test machine, the image's init runs
+the checks as PID 1 under a real kernel, prints `VERIFY PASS` or `VERIFY FAIL
+<why>` on serial, and stormcentral destroys the VM. No root anywhere, and no
+privileged pod. The image is a UEFI disk: the Shell starts the build VM's own
+kernel with a busybox initramfs carrying `fsck.fat` (dosfstools), the loop,
+fat, vfat and nls modules, and this checkout's `fio-dos` with the `fill`,
+`verify` and `fsck` examples. Each case — FAT12 8 MiB, FAT16 64 MiB, FAT32
+512 MiB, and a 2 GiB FAT32 holding a 200 MiB file — goes:
+
+```
+fill (no kernel) -> fsck-fat, fsck.fat -n -> loop-mount -> kernel reads every file
+  -> kernel writes 700 KiB and a long-named directory -> unmount
+  -> fsck.fat -n, fsck-fat -> we read every file back, and the kernel's
+  -> we rename, remove and add -> fsck-fat, fsck.fat -n
+  -> the kernel mounts it again and sees exactly that -> fsck.fat -n
+```
+
+```sh
+SC_BUILD_OUT=tmp/fio-dos-verify.img SC_BUILD_OUT_TO=tmp/fio-dos-verify.img \
+  sc-build 'tests/vm/build-image.sh tmp/fio-dos-verify.img'
+stormcentral testhost boot nanatest1 --image tmp/fio-dos-verify.img \
+  --expect 'VERIFY PASS' --fail 'VERIFY FAIL' --timeout 900 --memory 2048 \
+  --project fio.dos.rs --url http://stormcentral.g8.lo
+```
+
+Last pass: 2026-10-13, run `7e583db0d4` on nanatest1, image built by
+`sc-build` from `6a74877` (kernel 7.2.8-200.fc44, mkfs-dos `a55c537`): all
+four cases clean, `VERIFY PASS` 11.5 s after power-on.
+
+The same sequence also exists as this crate's test container (`test/`, per
+the stormcos test standard), run in a privileged pod:
 
 ```sh
 stormcentral test run fio.dos.rs short    # FAT12, FAT16, FAT32, both directions
-stormcentral test run fio.dos.rs medium   # and a second round on each: we rename,
-                                          # remove and add after the kernel wrote,
-                                          # and the kernel mounts it again
+stormcentral test run fio.dos.rs medium   # and the second round on each
 stormcentral test run fio.dos.rs long     # and a 2 GiB FAT32 with a 200 MiB file
 ```
 
-The judges are the node's kernel, `fsck.fat -n` from dosfstools, and
-`mkfs-dos`'s own checker (`examples/fsck`, staged as `fsck-fat`). `/test`
-prints one JSON line per check and a summary line, and exits 0 on a pass, 1 on
-any failure, and 2 ("could not run") when the kernel judged nothing — a node
-without a loop device or without vfat reports the kernel checks as skip, never
-as a pass. Images are sparse files in the pod's temp directory; every loop
-device and mount is undone on exit.
-
-**The privileged pod is not where this check is meant to end up.** The owner
-ruled on 2026-10-06 (#1) that the kernel verification runs in a throwaway VM
-booted by stormcentral (`stormcentral testhost boot`): a small kernel+busybox
-image, built by `sc-build`, whose init runs the same sequence — fill,
-`fsck.fat -n`, loop-mount, the kernel reads and writes, `fsck.fat -n`, we read
-it back — and prints `VERIFY PASS` or `VERIFY FAIL <why>` on serial. That
-image does not exist yet; `test/` is the pod form, and #1 stays open until the
-VM form replaces it.
-
-Last kernel passes: by hand with `verify-on-linux.sh` when `v0.1.0` was cut
-(2026-08-19); in the container on test machine pvetest2 (kernel 7.2.8) on
-2026-10-07, run `99e14c33ed`, where every kernel check passed on all three
-widths in both directions. That run is recorded as an error, not a pass: its
-JSON lines had spaces, which the kubelet log mangles (fixed since). No run has
-been recorded as passed: every run since errors before it starts, because the
-runner still sends the test-image build to the retired dev.g8.lo
-(stormcentral#526).
+`/test` prints one JSON line per check and a summary line, and exits 0 on a
+pass, 1 on any failure, and 2 ("could not run") when the kernel judged nothing
+— a node without a loop device or without vfat reports the kernel checks as
+skip, never as a pass. Its kernel checks passed on pvetest2 on 2026-10-07 (run
+`99e14c33ed`, recorded as an error because of the kubelet log, since fixed).
+Whether `test/` stays now that the VM form exists is the owner's call (#6).
 
 "We can read our own files" and "the filesystem is right" are different claims.
 The kernel settles the second.
@@ -209,7 +218,7 @@ and FAT32 images it creates in temporary files. Every test ends with a check by
 `mkfs_dos::fsck`, the Rust reimplementation of `fsck.fat` in the companion
 crate. It needs no root and no kernel.
 
-`test/` is the kernel check described under *Verified*: `test/build.sh`
+`tests/vm/` is the kernel check described under *Verified*: `build-image.sh OUT.img` makes the disk and `init.sh` is its PID 1. `test/` is the same sequence as a test container: `test/build.sh`
 stages static `fio-dos`, the `fill`, `verify` and `fsck` examples (the last over the pinned
 mkfs-dos checker, staged as `fsck-fat`), `test/Containerfile` packages them on fedora-minimal with dosfstools
 and util-linux, and `/test <suite>` (`test/test.sh`; the suite defaults to
