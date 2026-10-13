@@ -12,7 +12,7 @@
   `fsck-fat` and the kernel's loop mount in both directions and over a second
   round, then `VERIFY PASS` / `VERIFY FAIL <why>` on serial. Built with
   `sc-build` (`SC_BUILD_OUT`), booted with `stormcentral testhost boot
-  nanatest1`; run `7e583db0d4` passed. `test/` is unchanged pending #6.
+  nanatest1`; runs `7e583db0d4` and `eed50112ef` passed. `test/` is unchanged pending #6.
 
 ### 2026-10-10
 - **docs:** Refreshed from the code. README: the CLI's `--long` and

@@ -188,9 +188,10 @@ stormcentral testhost boot nanatest1 --image tmp/fio-dos-verify.img \
   --project fio.dos.rs --url http://stormcentral.g8.lo
 ```
 
-Last pass: 2026-10-13, run `7e583db0d4` on nanatest1, image built by
-`sc-build` from `6a74877` (kernel 7.2.8-200.fc44, mkfs-dos `a55c537`): all
-four cases clean, `VERIFY PASS` 11.5 s after power-on.
+Last pass: 2026-10-13, run `eed50112ef` on nanatest1, image built by
+`sc-build` from `fca8020` (kernel 7.2.8-200.fc44, mkfs-dos `a55c537`,
+dosfstools 4.2): all four cases clean, `VERIFY PASS` 13.7 s after power-on
+(and run `7e583db0d4`, from `6a74877`, before it).
 
 The same sequence also exists as this crate's test container (`test/`, per
 the stormcos test standard), run in a privileged pod:

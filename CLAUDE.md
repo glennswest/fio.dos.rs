@@ -135,7 +135,8 @@ on that host. The build does not yet fail on warnings (#5).
       both rounds, and prints VERIFY PASS/FAIL. Verified: image built by
       sc-build from 6a74877 (kernel 7.2.8-200.fc44, mkfs-dos a55c537);
       `testhost boot nanatest1` run 7e583db0d4 printed VERIFY PASS after
-      11.5 s, FAT12/FAT16/FAT32/2 GiB FAT32 all clean. `test/` is left as
+      11.5 s, FAT12/FAT16/FAT32/2 GiB FAT32 all clean; again from fca8020
+      (dosfstools 4.2), run eed50112ef, 13.7 s. sc-build passes at fca8020. `test/` is left as
       it is until the owner answers #6.
 - [x] #4 — `v0.1.1` cut from `main` (2026-10-06). sc-build of
       `cargo install --git … --tag v0.1.1` installs and runs `fio-dos 0.1.1`;
