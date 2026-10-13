@@ -129,6 +129,15 @@ on that host. The build does not yet fail on warnings (#5).
       machine must list fio.dos.rs (stormcentral#478). #1 closes on a
       VERIFY PASS from that, then `test/` is retired or kept as the pod
       form if the owner wants it.
+      IN PROGRESS (2026-10-13): the VM form, after fio.ext4.rs's
+      `tests/vm/` (its run 37320f36bd passed on nanatest1).
+      `tests/vm/build-image.sh OUT.img` makes a UEFI disk (Shell -> the
+      build VM's kernel + a busybox initramfs with fsck.fat, the
+      loop/fat/vfat/nls modules, fio-dos and the fill/verify/fsck
+      examples); `tests/vm/init.sh` (PID 1) runs test.sh's medium+long
+      sequence and prints VERIFY PASS/FAIL. `test/` is left as it is
+      until the owner answers #6 (options 1 and 2 both close #1 on the
+      VM pass).
 - [x] #4 — `v0.1.1` cut from `main` (2026-10-06). sc-build of
       `cargo install --git … --tag v0.1.1` installs and runs `fio-dos 0.1.1`;
       the same against `v0.1.0` still fails on the `[patch]`, as expected.
