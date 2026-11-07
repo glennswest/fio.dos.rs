@@ -207,7 +207,7 @@ pass, 1 on any failure, and 2 ("could not run") when the kernel judged nothing
 — a node without a loop device or without vfat reports the kernel checks as
 skip, never as a pass. Its kernel checks passed on pvetest2 on 2026-10-07 (run
 `99e14c33ed`, recorded as an error because of the kubelet log, since fixed).
-Whether `test/` stays now that the VM form exists is the owner's call (#6).
+The owner answered #6 on 2026-10-13: the VM form is the kernel check, and `test/` is kept as the pod form.
 
 "We can read our own files" and "the filesystem is right" are different claims.
 The kernel settles the second.

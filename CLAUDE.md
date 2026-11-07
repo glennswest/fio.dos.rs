@@ -44,8 +44,8 @@ round-trip suite needs no root. The kernel check is the throwaway VM the owner r
 read back and change it → the kernel mounts again, and prints `VERIFY PASS` /
 `VERIFY FAIL <why>` on serial; `stormcentral testhost boot nanatest1` boots it
 (README "Verified"). The `test/` container (`stormcentral test run fio.dos.rs
-short|medium|long`) runs the same sequence as a privileged Job; whether it is
-kept is #6. `tests/verify-on-linux.sh user@host` is the same check by hand, and needs root
+short|medium|long`) runs the same sequence as a privileged Job; it is kept
+as the pod form (#6 answered, 2026-10-13). `tests/verify-on-linux.sh user@host` is the same check by hand, and needs root
 on that host. The build does not yet fail on warnings (#5).
 
 ## Shape
@@ -113,10 +113,11 @@ on that host. The build does not yet fail on warnings (#5).
       spaces (fixed in a2d2e16, so `·` is used). Run 90cf1bd754 (a2d2e16):
       results parsed, but it skipped because `losetup -f` says
       "/dev/loop0 (lost)" when the pod has no node for it (fixed in 4da20ab).
-      Every run since errors on the test-image build: dev.g8.lo is retired
-      (stormcentral#521) and the runner still sends to it, stormcentral#526.
-      Proposed --after stormcentral#526. Next: `stormcentral test run
-      fio.dos.rs short|medium --tag <machine>` at 4da20ab or later.
+      Runs after that errored on the test-image build (dev.g8.lo retired,
+      stormcentral#521); stormcentral#526 is closed, so test images now build
+      on their own build VM. A pod-form re-run
+      (`stormcentral test run fio.dos.rs short|medium --tag <machine>` at
+      4da20ab or later) waits only on a test machine.
       NOT DONE BY THIS: the owner ruled on 2026-10-06 (#1, before the pod
       work was pushed) that the kernel check runs in a throwaway VM via
       `stormcentral testhost boot nanatest1 --image F --expect "VERIFY
@@ -137,7 +138,7 @@ on that host. The build does not yet fail on warnings (#5).
       `testhost boot nanatest1` run 7e583db0d4 printed VERIFY PASS after
       11.5 s, FAT12/FAT16/FAT32/2 GiB FAT32 all clean; again from fca8020
       (dosfstools 4.2), run eed50112ef, 13.7 s. sc-build passes at fca8020. `test/` is left as
-      it is until the owner answers #6.
+      it is; the owner answered #6 (2026-10-13): kept as the pod form.
 - [x] #4 — `v0.1.1` cut from `main` (2026-10-06). sc-build of
       `cargo install --git … --tag v0.1.1` installs and runs `fio-dos 0.1.1`;
       the same against `v0.1.0` still fails on the `[patch]`, as expected.
@@ -146,4 +147,6 @@ on that host. The build does not yet fail on warnings (#5).
 - [x] Docs refreshed from the code since 2026-10-02 (2026-10-10): CLI long
       flags, `/test` exit codes and `$STORM_SUITE`, the examples' arguments,
       the owner's VM ruling on #1, stormcentral#526 as the blocker.
+- [x] Docs refreshed (2026-11-07): no code changed since 2026-10-16; the
+      stale #6 and stormcentral#526 statements corrected (#9, #11).
 - [ ] #5 — make warnings fail the build (`[lints.rust]`, clippy -D warnings).

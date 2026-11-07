@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### 2026-11-07
+- **docs:** Refreshed from the code. No code has changed since 2026-10-16
+  (only a research note). Corrected the statements that had gone stale:
+  `test/` is kept as the pod form (the owner answered #6 on 2026-10-13), and
+  stormcentral#526 is closed, so it no longer blocks a pod-form re-run (README,
+  CLAUDE.md; #9, #11). The 2026-10-10 and 2026-10-13 entries below are history
+  and are left as written.
+
 ### 2026-10-13
 - **test:** The kernel check runs in a throwaway VM, as the owner ruled on #1:
   `tests/vm/build-image.sh` makes a UEFI disk whose Shell starts the build
