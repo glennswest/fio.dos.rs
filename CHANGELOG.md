@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### 2026-11-14
+- **docs:** Re-checked README, docs/ and CLAUDE.md against the code. Nothing
+  changed since 2026-11-07 except a research note (`docs/research/2026-11-14.md`),
+  so no statement needed correcting. #9 and #11 were fixed on 2026-11-07.
+
 ### 2026-11-07
 - **docs:** Refreshed from the code. No code has changed since 2026-10-16
   (only a research note). Corrected the statements that had gone stale:
