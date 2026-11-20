@@ -228,7 +228,10 @@ impl Allocator {
         let span = self.max_cluster - 1;
         let mut cluster = self.next_free.max(2);
         for _ in 0..span {
-            if self.entry(cluster) == 0 && !found.contains(&cluster) {
+            // The walk starts at one cluster and wraps once, visiting each of
+            // the `span` clusters exactly once, so no cluster can be found
+            // twice and nothing needs checking against what was found.
+            if self.entry(cluster) == 0 {
                 found.push(cluster);
                 if found.len() == count as usize {
                     break;
@@ -317,9 +320,16 @@ impl Allocator {
     /// Every FAT, always. The second FAT is not a fallback a driver reaches for
     /// when the first looks wrong — it is a copy every driver assumes is
     /// current.
+    ///
+    /// A sector stops being dirty only once every copy of it has been written,
+    /// and the FSInfo only once its write has succeeded. So a flush that fails
+    /// part way, or is cancelled at one of its awaits, leaves everything it
+    /// did not finish still marked, and the next flush writes it: a retry that
+    /// returns `Ok` has put the whole cache on the device. Rewriting a sector
+    /// a failed flush had already written is harmless.
     pub async fn flush<D: BlockDevice>(&mut self, fs: &Filesystem<D>) -> Result<()> {
         let sector_size = self.sector_size as usize;
-        let sectors = std::mem::take(&mut self.dirty_sectors);
+        let sectors: Vec<u32> = self.dirty_sectors.iter().copied().collect();
         for sector in sectors {
             let start = sector as usize * sector_size;
             let end = (start + sector_size).min(self.fat.len());
@@ -328,11 +338,11 @@ impl Allocator {
                 let offset = fs.fat_offset(index) + start as u64;
                 fs.device().write_at(offset, data).await?;
             }
+            self.dirty_sectors.remove(&sector);
         }
 
         if self.fsinfo_dirty {
-            if let Some(info) = fs.read_fsinfo().await? {
-                let _ = info;
+            if fs.read_fsinfo().await?.is_some() {
                 fs.write_fsinfo(&FsInfo {
                     free_clusters: self.free_count,
                     next_cluster: self.next_free,
@@ -457,6 +467,145 @@ mod tests {
         let chain = alloc.allocate(3).unwrap();
         alloc.commit();
         alloc.rollback();
+        assert_eq!(alloc.chain(chain[0]).unwrap(), chain);
+    }
+
+    /// A device that fails, or never finishes, writes touching one range.
+    struct Faulty {
+        inner: MemDevice,
+        fault: std::sync::Mutex<Option<(u64, u64, bool)>>,
+    }
+
+    impl Faulty {
+        /// Fail writes to `[start, start + len)`, or hang on them if `hang`.
+        fn arm(&self, start: u64, len: u64, hang: bool) {
+            *self.fault.lock().unwrap() = Some((start, start + len, hang));
+        }
+
+        fn disarm(&self) {
+            *self.fault.lock().unwrap() = None;
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl BlockDevice for Faulty {
+        fn size(&self) -> u64 {
+            self.inner.size()
+        }
+
+        async fn read_at(&self, offset: u64, buf: &mut [u8]) -> std::result::Result<(), mkfs_dos::Error> {
+            self.inner.read_at(offset, buf).await
+        }
+
+        async fn write_at(&self, offset: u64, buf: &[u8]) -> std::result::Result<(), mkfs_dos::Error> {
+            let fault = *self.fault.lock().unwrap();
+            if let Some((start, end, hang)) = fault {
+                if offset < end && offset + buf.len() as u64 > start {
+                    if hang {
+                        std::future::pending::<()>().await;
+                    }
+                    return Err(mkfs_dos::Error::Io {
+                        offset,
+                        source: std::io::Error::other("injected fault"),
+                    });
+                }
+            }
+            self.inner.write_at(offset, buf).await
+        }
+
+        async fn flush(&self) -> std::result::Result<(), mkfs_dos::Error> {
+            self.inner.flush().await
+        }
+    }
+
+    async fn faulty(size: u64) -> (Filesystem<Faulty>, Allocator) {
+        let inner = MemDevice::new(size);
+        format(&inner, &Params::new()).await.unwrap();
+        let dev = Faulty {
+            inner,
+            fault: std::sync::Mutex::new(None),
+        };
+        let fs = Filesystem::open(dev).await.unwrap();
+        let alloc = Allocator::load(&fs).await.unwrap();
+        (fs, alloc)
+    }
+
+    /// The FAT on the device, every copy, against the cache.
+    async fn assert_on_device(fs: &Filesystem<Faulty>, alloc: &Allocator) {
+        for index in 0..fs.boot().num_fats {
+            assert_eq!(fs.read_fat(index).await.unwrap(), alloc.fat, "FAT {index}");
+        }
+        if let Some(info) = fs.read_fsinfo().await.unwrap() {
+            assert_eq!(info.free_clusters, alloc.free_count());
+            assert_eq!(info.next_cluster, alloc.next_free);
+        }
+    }
+
+    /// dcad66f4201f, ffa48a70d950, 25d7393c6594: a flush that fails keeps
+    /// what it did not finish, and the retry writes it — whichever FAT copy,
+    /// or the FSInfo, the failure hit.
+    #[tokio::test]
+    async fn a_failed_flush_is_finished_by_the_retry() {
+        for (size, target) in [
+            (64 * MIB, "FAT 0"),
+            (64 * MIB, "FAT 1"),
+            (1024 * MIB, "FAT 1"),
+            (1024 * MIB, "FSInfo"),
+        ] {
+            let (fs, mut alloc) = faulty(size).await;
+            // Enough clusters to dirty several FAT sectors.
+            let chain = alloc.allocate(2000).unwrap();
+            let sector = fs.boot().bytes_per_sector as u64;
+            let (start, len) = match target {
+                "FAT 0" => (fs.fat_offset(0) + 2 * sector, sector),
+                "FAT 1" => (fs.fat_offset(1) + 2 * sector, sector),
+                _ => (fs.boot().sector_offset(fs.boot().info_sector as u64), sector),
+            };
+            fs.device().arm(start, len, false);
+            assert!(alloc.flush(&fs).await.is_err(), "{target}: the flush failed");
+            fs.device().disarm();
+
+            alloc.flush(&fs).await.unwrap();
+            assert_on_device(&fs, &alloc).await;
+            assert_eq!(fs.fat_entry(chain[0]).await.unwrap(), chain[1], "{target}");
+        }
+    }
+
+    /// The same for a flush cancelled at an await: dropping it part way loses
+    /// nothing either.
+    #[tokio::test]
+    async fn a_cancelled_flush_is_finished_by_the_retry() {
+        let (fs, mut alloc) = faulty(1024 * MIB).await;
+        alloc.allocate(2000).unwrap();
+        let sector = fs.boot().bytes_per_sector as u64;
+        fs.device().arm(fs.fat_offset(1) + 2 * sector, sector, true);
+        let cancelled =
+            tokio::time::timeout(std::time::Duration::from_millis(100), alloc.flush(&fs)).await;
+        assert!(cancelled.is_err(), "the flush hung and was dropped");
+        fs.device().disarm();
+
+        alloc.flush(&fs).await.unwrap();
+        assert_on_device(&fs, &alloc).await;
+    }
+
+    /// 36d21b732805: allocating is linear in the volume. Every free cluster of
+    /// a 1 GiB FAT32 in one chain: with the old duplicate scan that is tens of
+    /// billions of comparisons, minutes even optimised; without it, a pass.
+    #[tokio::test]
+    async fn allocating_the_whole_volume_is_one_pass() {
+        let (_fs, mut alloc) = volume(1024 * MIB).await;
+        let free = alloc.free_count();
+        assert!(free > 100_000, "{free} clusters is not a large enough test");
+
+        let began = std::time::Instant::now();
+        let chain = alloc.allocate(free).unwrap();
+        let took = began.elapsed();
+        assert!(took < std::time::Duration::from_secs(10), "took {took:?}");
+
+        assert_eq!(chain.len() as u32, free);
+        assert_eq!(alloc.free_count(), 0);
+        let distinct: BTreeSet<u32> = chain.iter().copied().collect();
+        assert_eq!(distinct.len(), chain.len(), "no cluster twice");
         assert_eq!(alloc.chain(chain[0]).unwrap(), chain);
     }
 

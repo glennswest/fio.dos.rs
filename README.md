@@ -280,6 +280,10 @@ could join two files' clusters. Rewriting an existing file writes over its
 clusters in place, so a data write that fails part way leaves that file's old
 size and chain holding some new bytes; the filesystem stays consistent.
 
+A `flush()` that fails, or is dropped part way, can be retried: a FAT sector
+stays marked until every copy of it is written, and the FSInfo until it is,
+so a retry that returns `Ok` has written everything.
+
 The cache costs what the FAT costs: 4 bytes per cluster on FAT32, so a megabyte
 for a 1 GiB volume.
 

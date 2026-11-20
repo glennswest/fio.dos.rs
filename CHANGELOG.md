@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### 2026-11-20
+- **fix:** The review findings on `src/alloc.rs` (#13):
+  - `Allocator::flush` keeps a FAT sector dirty until every FAT copy of it is
+    written, and the FSInfo until its write succeeds, so a flush that fails or
+    is cancelled part way is finished by the retry instead of lost
+    (dcad66f4201f, ffa48a70d950, 25d7393c6594).
+  - `allocate` no longer checks each found cluster against the ones already
+    found — quadratic, and unneeded since the wrap visits each cluster once
+    (36d21b732805). Allocating every cluster of a 1 GiB FAT32 is one pass.
+  - Tests: a failing and a hanging device in `alloc::tests` (failure on FAT 0,
+    FAT 1 and the FSInfo, and a cancelled flush, each retried), and a
+    whole-volume allocation.
 - **fix:** The review findings on `src/volume.rs` (#12):
   - `..` under the root (cluster 0, or the FAT32 root's own cluster) resolves
     to the root on every width, in one place used by every path walk;
