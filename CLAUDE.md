@@ -167,3 +167,9 @@ on that host. The build does not yet fail on warnings (#5).
       DONE (2026-11-20, 0ed8926): sc-build job 3a305a6f2c passed — 29 unit,
       9 fault, 6 path and 20 round-trip tests, every one ending in fsck.
       #13 (alloc flush retry) and #14 (dir terminator) are still open.
+- [ ] #13 — the 4 review findings in `src/alloc.rs` (2026-11-20). Plan:
+      `allocate` drops the `found.contains` scan (the bounded wrap visits each
+      cluster once); `flush` removes a sector from the dirty set only once
+      every FAT copy of it is written, and clears `fsinfo_dirty` only once the
+      FSInfo write succeeds, so an error or a cancelled flush leaves the rest
+      for the retry. Unit tests with a failing and a hanging device.
