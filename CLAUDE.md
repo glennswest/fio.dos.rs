@@ -150,3 +150,17 @@ on that host. The build does not yet fail on warnings (#5).
 - [x] Docs refreshed (2026-11-07): no code changed since 2026-10-16; the
       stale #6 and stormcentral#526 statements corrected (#9, #11).
 - [ ] #5 — make warnings fail the build (`[lints.rust]`, clippy -D warnings).
+- [ ] #12 — the 11 review findings in `src/volume.rs` (2026-11-20). Plan:
+      paths: `..` navigates on reads (cluster 0 / the FAT32 root cluster in a
+      `..` entry is the root) and is refused in every mutating path; dot
+      entries are never a mutation target. One matching helper for lookup and
+      collisions that sees the long name and the short alias; generated
+      aliases avoid other entries' long names. `read` refuses a size its
+      chain cannot hold. Caller attributes limited to RO/HIDDEN/SYSTEM/ARCHIVE.
+      Rename refuses a move into the source or a descendant by walking the
+      destination's `..` chain. Failure safety: an undo journal in
+      `Allocator` (begin/commit/rollback); allocate before, free only after
+      the directory write lands; a failed directory write is read back —
+      unchanged → roll back, landed → finish, anything else → the volume is
+      poisoned (mutations and flush refused). Tests with a fault-injecting
+      device in `tests/faults.rs`.
