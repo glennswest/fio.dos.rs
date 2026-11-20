@@ -89,16 +89,30 @@ absolute inside the volume and uses `/`:
 | `append(path, data)` | add to the end of a file (it reads the file and writes it back whole) |
 | `mkdir` / `mkdir_all` | one directory, or a path with its parents |
 | `unlink` / `rmdir` / `remove_all` | a file, an empty directory, or a tree |
-| `rename(from, to)` | move or rename, across directories, with `..` kept right |
+| `rename(from, to)` | move or rename, across directories, with `..` kept right; a directory is never moved into itself or below itself, however the destination is spelled |
 | `stat` / `exists` / `read_dir` | look without changing anything |
-| `set_attributes` / `set_modified` | the attribute bits and the timestamp |
+| `set_attributes` / `set_modified` | the attribute bits (read-only, hidden, system, archive) and the timestamp |
 | `label` / `set_label` | the volume label |
 | `free_clusters` / `free_bytes` / `filesystem` | space and geometry |
 | `set_time(secs)` | fix the clock, so an image built twice is identical |
 | `flush()` | write the FAT (every copy) and FSInfo back |
+| `is_poisoned()` | whether a failed write has left the volume refusing changes (see Durability) |
 
 `Attrs::read_only()`, `Attrs::system()` (hidden + system) and
-`.modified_at(secs)` give a file its attributes as it is created.
+`.modified_at(secs)` give a file its attributes as it is created. Only
+read-only, hidden, system and archive can be given; the directory and
+volume-label bits are refused with `Error::InvalidAttributes`, since they say
+what kind of entry it is.
+
+Paths use `/`; empty components and `.` are skipped, and names match without
+regard to ASCII case, by long name or by 8.3 alias (`LONGFI~1.TXT` reads, writes
+and renames `Long File.txt`). `..` goes up a directory when reading
+(`read_dir("/a/..")` is the root). A path that is changed — written, created,
+removed, renamed, its attributes or time set — may not contain `..`, and is
+refused with `Error::InvalidPath`: `.` and `..` entries are never a target.
+
+`read` refuses, as corrupt, a file whose recorded size its cluster chain cannot
+hold, rather than returning it short.
 
 `read_dir` returns `Entry` values, and `stat` returns a `Stat` (the same type).
 Each one carries the long name, the short name, `is_dir`, the size, the
@@ -141,7 +155,9 @@ A name that fits the 8.3 field is stored in it, including a lowercase one:
 is what every other implementation does and what keeps a simple directory
 simple. Anything else — `A Long File Name.txt`, `ReadMe.md`, `café ☕.txt`,
 `two.dots.tar.gz`, `.config` — gets long-name slots and a generated `NAME~1`
-short name, with the number climbing on a collision.
+short name, with the number climbing on a collision. A generated short name
+avoids both the other entries' short names and their long names, so no two
+files in a directory answer to one name.
 
 The reverse direction is checked too: fragments whose checksum does not match
 the short entry they precede are *ignored*, and the short name is used. That is
@@ -251,6 +267,18 @@ is open — an allocator that read it an entry at a time would make one device
 round trip per cluster of every file — and it goes out, to every FAT, along with
 the FSInfo sector, when you flush. A volume dropped without a flush leaves the
 file data on the device and no chain pointing at it.
+
+A change that fails part way does not leave the cache and the directories
+disagreeing. Clusters are allocated before the entry that names them is
+written and freed only after the entry that named them is gone. When a
+directory write fails, the directory is read back: unchanged, the allocation is
+taken back and the error returned; changed as intended, the change is finished
+and the error still returned. Anything else, or a read-back that fails too,
+*poisons* the volume: every later change and `flush()` returns
+`Error::Poisoned`, because writing the FAT over a directory in an unknown state
+could join two files' clusters. Rewriting an existing file writes over its
+clusters in place, so a data write that fails part way leaves that file's old
+size and chain holding some new bytes; the filesystem stays consistent.
 
 The cache costs what the FAT costs: 4 bytes per cluster on FAT32, so a megabyte
 for a 1 GiB volume.

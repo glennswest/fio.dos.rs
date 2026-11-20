@@ -175,10 +175,18 @@ pub fn write_short(data: &mut [u8], slot: usize, entry: &DirEntry) {
 pub fn build_set(name: &str, taken: &[Entry]) -> crate::error::Result<(Vec<LfnEntry>, ShortName)> {
     name::validate(name)?;
 
+    // A short name is taken when another entry has it as its alias, and also
+    // when another entry has it as its long name: a reader that asks for
+    // `FOO~1.TXT` must not find two files answering to it.
     let occupied = |raw: &[u8; 11]| {
+        let shown = DirEntry {
+            name: *raw,
+            ..Default::default()
+        }
+        .short_name();
         taken
             .iter()
-            .any(|e| &e.entry.name == raw)
+            .any(|e| &e.entry.name == raw || name::names_equal(&e.name, &shown))
     };
 
     if let Some(short) = name::exact_short_name(name) {
@@ -307,6 +315,32 @@ mod tests {
 
         assert_eq!(parse(&data).len(), 1);
         assert_eq!(find_label(&data).unwrap().0, 0);
+    }
+
+    /// bbc3584c0279: a generated alias must not be another entry's long name,
+    /// or a reader asking for that name finds two files.
+    #[test]
+    fn a_generated_alias_avoids_another_entrys_long_name() {
+        let mut data = empty_dir(16);
+        // A long name that looks like an alias, stored under another short
+        // name — as a writer that found FOOBAR~1 taken would have left it.
+        let short = *b"OTHER   TXT";
+        let checksum = DirEntry {
+            name: short,
+            ..Default::default()
+        }
+        .short_name_checksum();
+        let fragments = name::encode_lfn("FOOBAR~1.TXT", checksum);
+        let entry = DirEntry {
+            name: short,
+            attr: Attributes::ARCHIVE,
+            ..Default::default()
+        };
+        write_set(&mut data, 0, &fragments, &entry);
+        assert_eq!(parse(&data)[0].name, "FOOBAR~1.TXT");
+
+        let (_, generated) = build_set("Foo Bar.txt", &parse(&data)).unwrap();
+        assert_eq!(&generated.raw, b"FOOBAR~2TXT");
     }
 
     /// A long name whose fragments were left by a rename that something without

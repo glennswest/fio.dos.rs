@@ -35,6 +35,18 @@ pub struct Allocator {
     free_count: u32,
     dirty_sectors: BTreeSet<u32>,
     fsinfo_dirty: bool,
+    /// The undo record of the change in progress, between [`Allocator::begin`]
+    /// and [`Allocator::commit`] or [`Allocator::rollback`].
+    journal: Option<Journal>,
+}
+
+/// What [`Allocator::rollback`] needs to put the cache back as it was.
+struct Journal {
+    /// Every entry changed, with the value it had before — oldest first.
+    entries: Vec<(u32, u32)>,
+    free_count: u32,
+    next_free: u32,
+    fsinfo_dirty: bool,
 }
 
 impl Allocator {
@@ -72,6 +84,7 @@ impl Allocator {
             free_count,
             dirty_sectors: BTreeSet::new(),
             fsinfo_dirty: false,
+            journal: None,
         })
     }
 
@@ -96,6 +109,11 @@ impl Allocator {
     /// twelve-bit entry's second byte can be the first byte of the next sector,
     /// and flushing only the first leaves half an entry on disk.
     pub fn set_entry(&mut self, cluster: u32, value: u32) {
+        if let Some(journal) = self.journal.as_mut() {
+            journal
+                .entries
+                .push((cluster, fat::get_entry(&self.fat, self.fat_type, cluster)));
+        }
         let offset = fat::entry_offset(self.fat_type, cluster);
         let span = fat::entry_span(self.fat_type);
         fat::set_entry(&mut self.fat, self.fat_type, cluster, value);
@@ -104,6 +122,46 @@ impl Allocator {
         for sector in first..=last {
             self.dirty_sectors.insert(sector as u32);
         }
+    }
+
+    /// Start recording, so the changes from here on can be taken back.
+    ///
+    /// A volume operation allocates before it knows whether the directory
+    /// entry naming the clusters will reach the device. If it does not, the
+    /// allocation has to be undone, or a later flush writes a chain nothing
+    /// names. A `begin` while a change is already open keeps the older record:
+    /// the change it belongs to has not ended.
+    pub fn begin(&mut self) {
+        if self.journal.is_none() {
+            self.journal = Some(Journal {
+                entries: Vec::new(),
+                free_count: self.free_count,
+                next_free: self.next_free,
+                fsinfo_dirty: self.fsinfo_dirty,
+            });
+        }
+    }
+
+    /// Keep everything since [`Allocator::begin`].
+    pub fn commit(&mut self) {
+        self.journal = None;
+    }
+
+    /// Put every entry and counter back as it was at [`Allocator::begin`].
+    ///
+    /// The restored sectors stay marked dirty: writing back what the device
+    /// already holds costs a write and changes nothing. Without an open
+    /// change, this does nothing.
+    pub fn rollback(&mut self) {
+        let Some(journal) = self.journal.take() else {
+            return;
+        };
+        for &(cluster, old) in journal.entries.iter().rev() {
+            self.set_entry(cluster, old);
+        }
+        self.free_count = journal.free_count;
+        self.next_free = journal.next_free;
+        self.fsinfo_dirty = journal.fsinfo_dirty;
     }
 
     /// Is this a cluster the volume has?
@@ -369,6 +427,37 @@ mod tests {
         alloc.set_entry(straddling, 0x777);
         alloc.flush(&fs).await.unwrap();
         assert_eq!(fs.fat_entry(straddling).await.unwrap(), 0x777);
+    }
+
+    /// Finding 0d6b59b69c3d: an allocation whose directory entry never
+    /// reached the device has to be taken back whole.
+    #[tokio::test]
+    async fn a_rollback_takes_back_every_change_since_begin() {
+        let (_fs, mut alloc) = volume(64 * MIB).await;
+        let kept = alloc.allocate(3).unwrap();
+        let free = alloc.free_count();
+        let before: Vec<u32> = (2..=alloc.max_cluster()).map(|c| alloc.entry(c)).collect();
+
+        alloc.begin();
+        alloc.extend(kept[2], 4).unwrap();
+        alloc.allocate(5).unwrap();
+        alloc.truncate(kept[0], 1).unwrap();
+        alloc.rollback();
+
+        let after: Vec<u32> = (2..=alloc.max_cluster()).map(|c| alloc.entry(c)).collect();
+        assert_eq!(before, after);
+        assert_eq!(alloc.free_count(), free);
+        assert_eq!(alloc.chain(kept[0]).unwrap(), kept);
+    }
+
+    #[tokio::test]
+    async fn a_commit_keeps_the_changes() {
+        let (_fs, mut alloc) = volume(64 * MIB).await;
+        alloc.begin();
+        let chain = alloc.allocate(3).unwrap();
+        alloc.commit();
+        alloc.rollback();
+        assert_eq!(alloc.chain(chain[0]).unwrap(), chain);
     }
 
     #[tokio::test]

@@ -72,6 +72,29 @@ pub enum Error {
         size: u64,
     },
 
+    /// Attribute bits a caller may not set on a file.
+    ///
+    /// Only read-only, hidden, system and archive are a file's own. The
+    /// directory and volume-label bits say what kind of entry it is, and an
+    /// ordinary file that claims either is read as something it is not.
+    #[error("{path}: attribute bits {bits:#04x} cannot be set; only read-only, hidden, system and archive (0x27) can")]
+    InvalidAttributes {
+        /// The path in question.
+        path: String,
+        /// The bits that were asked for.
+        bits: u8,
+    },
+
+    /// A directory write failed and what reached the device could not be
+    /// established.
+    ///
+    /// The volume refuses every change and every flush from then on: the
+    /// cached FAT no longer knows which directory entries name its chains, and
+    /// writing it out could join two files' clusters. The image is to be
+    /// thrown away, or checked and repaired with `fsck.fat`.
+    #[error("the volume is unusable: {0}")]
+    Poisoned(String),
+
     /// Something FAT has no way to express.
     #[error("{0}")]
     Unsupported(String),

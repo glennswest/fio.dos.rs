@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### 2026-11-20
+- **fix:** The review findings on `src/volume.rs` (#12):
+  - `..` under the root (cluster 0, or the FAT32 root's own cluster) resolves
+    to the root on every width, in one place used by every path walk;
+    `read_dir("/a/..")` lists the root and `/a/../file` finds it, where before
+    it was an empty directory and creating through it panicked (f16592d1a3b5).
+  - `..` is refused in every path that is changed, and `.`/`..` entries are
+    never a target: `rmdir("/A/..")` and `rename("/a/b/..", …)` no longer erase
+    or move a directory's bookkeeping (6fa79638bce5, 3ff6b13b3ec5).
+  - Rename refuses to move a directory into itself or a descendant by walking
+    the destination's `..` entries on disk, not by comparing path text, so
+    case, repeated `/` and `.` no longer get past it (44347c5c1704,
+    7086d9cf795f, e5fe266defb1).
+  - A file answers to its 8.3 alias for lookup, replace and collision, and a
+    generated alias avoids other entries' long names (bbc3584c0279).
+  - `read` returns a corruption error for a nonempty file with no cluster or a
+    chain shorter than its size, instead of a short read (c68efc8833ae,
+    bdefde03a16e).
+  - `write_with` and `set_attributes` refuse the directory and volume-label
+    bits and anything outside read-only/hidden/system/archive
+    (`Error::InvalidAttributes`); a directory keeps its kind (d7a26c69492e).
+  - Failure safety (0d6b59b69c3d): an undo journal in the allocator; clusters
+    are freed only after the directory write that drops them lands; a failed
+    directory write is read back and the change rolled back, finished, or —
+    when neither can be established — the volume poisoned
+    (`Error::Poisoned`, `Volume::is_poisoned`); a rename that fails half way
+    undoes its first half. Tested with a fault-injecting device
+    (`tests/faults.rs`); the path findings in `tests/paths.rs`.
+- **feat:** `Volume::is_poisoned`, `Error::Poisoned`, `Error::InvalidAttributes`;
+  `exists("/")` is now true and `remove_all("/")` is refused rather than doing
+  nothing.
+
 ### 2026-11-14
 - **docs:** Re-checked README, docs/ and CLAUDE.md against the code. Nothing
   changed since 2026-11-07 except a research note (`docs/research/2026-11-14.md`),
