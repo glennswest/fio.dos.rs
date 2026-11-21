@@ -149,14 +149,18 @@ on that host. The build does not yet fail on warnings (#5).
       the owner's VM ruling on #1, stormcentral#526 as the blocker.
 - [x] Docs refreshed (2026-11-07): no code changed since 2026-10-16; the
       stale #6 and stormcentral#526 statements corrected (#9, #11).
-- [ ] #15 — the 3 minor review findings (2026-11-21). 9aef8ceed235: `validate`
+- [x] #15 — the 3 minor review findings (2026-11-21). 9aef8ceed235: `validate`
       counts UTF-16 units (`MAX_LONG_UNITS` 255). b1f840bab51e: `free_run`
       grows the directory until a run fits (the run may span clusters);
       the fixed root still says `RootDirectoryFull`. f1e178d2225e:
       `test/test.sh` `attach`/`kmount` leave the device in `$LOOP_DEV` and
       run in the parent shell, `detach` untracks, INT/TERM exit through the
       trap; `tests/test_sh.rs` runs `tests/sh/test-sh-cleanup.sh` with
-      losetup/mount mocked. Next: sc-build, then close #15.
+      losetup/mount mocked. DONE (2026-11-21, c617f19 + f37a77d, the
+      fixed-root test reading the root size the formatter chose — #18):
+      sc-build job c0b7b1a401 passed — 38 unit, 9 fault, 10 path, 20
+      round-trip and the mocked test.sh trap test, every one ending in fsck.
+      That build includes 6a6c8f2, so #14's tests passed in it too.
 - [ ] #5 — make warnings fail the build (`[lints.rust]`, clippy -D warnings).
 - [x] #12 — the 11 review findings in `src/volume.rs` (2026-11-20). Plan:
       paths: `..` navigates on reads (cluster 0 / the FAT32 root cluster in a
