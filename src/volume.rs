@@ -1023,18 +1023,22 @@ impl<D: BlockDevice> Volume<D> {
         Ok(())
     }
 
-    /// Find a run of free slots, growing the directory if there is none.
+    /// Find a run of free slots, growing the directory until there is one.
+    ///
+    /// A run may span clusters (`write_dir_bytes` writes across the chain), so
+    /// a name of 21 slots in a directory of 512-byte clusters, 16 slots each,
+    /// takes as many clusters as it needs (b1f840bab51e). Each growth adds at
+    /// least one slot to the free tail, so this ends with a run, or with the
+    /// error that the volume is full or the fixed FAT12/16 root is. The
+    /// clusters added are in the caller's allocation journal, so a failure
+    /// gives them all back.
     async fn free_run(&mut self, dir: DirRef, bytes: &mut Vec<u8>, needed: usize) -> Result<usize> {
-        if let Some(at) = dir::find_free_run(bytes, needed) {
-            return Ok(at);
+        loop {
+            if let Some(at) = dir::find_free_run(bytes, needed) {
+                return Ok(at);
+            }
+            self.grow_dir(dir, bytes).await?;
         }
-        self.grow_dir(dir, bytes).await?;
-        dir::find_free_run(bytes, needed).ok_or_else(|| {
-            Error::Unsupported(format!(
-                "a name needing {needed} slots does not fit in one cluster; \
-                 raise the cluster size"
-            ))
-        })
     }
 
     /// Add one cluster to a directory.

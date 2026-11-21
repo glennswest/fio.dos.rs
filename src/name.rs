@@ -61,6 +61,9 @@ pub fn is_valid_long_char(c: char) -> bool {
     !matches!(c, '"' | '*' | '/' | ':' | '<' | '>' | '?' | '\\' | '|') && c >= ' '
 }
 
+/// The most UTF-16 units a long name may hold: 20 fragments of 13, less one.
+pub const MAX_LONG_UNITS: usize = 255;
+
 /// Check a name is one FAT can store at all, long or short.
 pub fn validate(name: &str) -> Result<()> {
     if name.is_empty() {
@@ -69,10 +72,13 @@ pub fn validate(name: &str) -> Result<()> {
     if name == "." || name == ".." {
         return Err(Error::invalid_name(name, "'.' and '..' are not names"));
     }
-    if name.chars().count() > 255 {
+    // The limit is in UTF-16 units, which is what the long-name slots hold:
+    // a character outside the Basic Multilingual Plane takes two of them, so
+    // 255 of those is 510 units and 40 fragments, not a name FAT can store.
+    if name.encode_utf16().count() > MAX_LONG_UNITS {
         return Err(Error::invalid_name(
             name,
-            "a long name holds at most 255 characters",
+            "a long name holds at most 255 UTF-16 units",
         ));
     }
     if let Some(c) = name.chars().find(|&c| !is_valid_long_char(c)) {
@@ -371,6 +377,32 @@ mod tests {
             assert!(fragments[0].sequence & LfnEntry::LAST != 0);
             assert_eq!(fragments.last().unwrap().sequence & !LfnEntry::LAST, 1);
         }
+    }
+
+    /// 9aef8ceed235: the limit counts UTF-16 units, not characters. An emoji
+    /// is two units, so 127 of them and one ASCII letter is exactly 255 and
+    /// fits in 20 fragments; 128 of them is 256 and is refused, as is 140
+    /// (280 units, 22 fragments) — though each is far under 255 characters.
+    #[test]
+    fn the_long_name_limit_is_in_utf16_units() {
+        let at_limit = format!("{}a", "😀".repeat(127));
+        assert_eq!(at_limit.encode_utf16().count(), 255);
+        validate(&at_limit).unwrap();
+        let fragments = encode_lfn(&at_limit, 0x11);
+        assert_eq!(fragments.len(), 20);
+        assert_eq!(decode_lfn(&fragments, 0x11).as_deref(), Some(at_limit.as_str()));
+
+        for over in ["😀".repeat(128), "😀".repeat(140), format!("{}ab", "😀".repeat(127))] {
+            assert!(over.chars().count() <= 255);
+            assert!(over.encode_utf16().count() > 255);
+            assert!(
+                matches!(validate(&over), Err(Error::InvalidName { .. })),
+                "{} units accepted",
+                over.encode_utf16().count()
+            );
+        }
+        validate(&"x".repeat(255)).unwrap();
+        assert!(validate(&"x".repeat(256)).is_err());
     }
 
     /// A name whose length is an exact multiple of thirteen has no room for the

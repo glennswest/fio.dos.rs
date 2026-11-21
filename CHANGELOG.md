@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### 2026-11-21
+- **fix:** The minor review findings (#15):
+  - A long name is limited to 255 UTF-16 units, what its 20 slots hold, not
+    255 characters: a character outside the BMP counts twice, so 140 emoji
+    are refused instead of written as 22 fragments (9aef8ceed235).
+  - A directory grows by as many clusters as a name's run needs, and the run
+    spans them; a 255-unit name (21 slots) in a full directory of 512-byte
+    clusters is written instead of failing with `Unsupported`. A full fixed
+    FAT12/16 root is still `RootDirectoryFull`, with nothing left allocated
+    (b1f840bab51e).
+  - `test/test.sh` attaches and mounts in its own shell, not a command
+    substitution, so the EXIT trap knows every loop device it made and
+    detaches them on an error path or a signal; a device the run detached
+    is dropped from the set (f1e178d2225e).
+  - Tests: the UTF-16 boundary in `name::tests`; multi-cluster growth for
+    files, a rename and emoji names on each width, and the fixed root, in
+    `tests/paths.rs`, fsck clean after; the trap with losetup and mount
+    mocked, in `tests/test_sh.rs` (`tests/sh/test-sh-cleanup.sh`).
+
 ### 2026-11-20
 - **fix:** The review findings on `src/dir.rs` (#14):
   - Slots past a directory's end marker are free whatever bytes they hold,

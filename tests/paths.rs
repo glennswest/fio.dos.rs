@@ -365,3 +365,81 @@ async fn an_alias_is_an_occupied_name() {
         assert_clean(&mut vol, &format!("{width:?} alias occupied")).await;
     }
 }
+
+/// b1f840bab51e: a name longer than one cluster of slots still fits. With
+/// 512-byte clusters a directory cluster holds 16 slots, and a 255-unit name
+/// needs 21 (20 fragments and the short entry): the directory grows by as
+/// many clusters as that takes, and the run spans them.
+#[tokio::test]
+async fn a_long_name_grows_a_directory_by_more_than_one_cluster() {
+    for (size, width) in [(MIB, FatType::Fat12), (16 * MIB, FatType::Fat16), (64 * MIB, FatType::Fat32)] {
+        let device = MemDevice::new(size);
+        let params = Params::new()
+            .fat_type(width)
+            .sectors_per_cluster(1)
+            .label("TESTVOL")
+            .invariant();
+        format(&device, &params).await.unwrap();
+        let mut vol = Volume::open(device).await.unwrap();
+        vol.set_time(1_426_325_213);
+        assert_eq!(vol.filesystem().cluster_size(), 512, "{width:?}");
+
+        // `.`, `..` and fourteen 8.3 names: one cluster, every slot used.
+        vol.mkdir("/d").await.unwrap();
+        for i in 0..14 {
+            vol.write(&format!("/d/F{i:02}.TXT"), b"").await.unwrap();
+        }
+        let free = vol.free_clusters();
+
+        let long = "x".repeat(255);
+        vol.write(&format!("/d/{long}"), b"").await.unwrap();
+        assert_eq!(free - vol.free_clusters(), 2, "{width:?}: 21 slots, two clusters added");
+        assert!(vol.exists(&format!("/d/{long}")).await.unwrap());
+
+        // And again on the clusters that has left: 11 free, 21 needed. The
+        // emoji are two UTF-16 units each, 255 units in all.
+        let emoji = format!("{}a", "😀".repeat(127));
+        vol.write(&format!("/d/{emoji}"), b"wide").await.unwrap();
+        assert_eq!(vol.read(&format!("/d/{emoji}")).await.unwrap(), b"wide");
+        let renamed = format!("{}b", "😀".repeat(127));
+        vol.write("/d/move.txt", b"m").await.unwrap();
+        vol.rename("/d/move.txt", &format!("/d/{renamed}")).await.unwrap();
+        assert_eq!(vol.read(&format!("/d/{renamed}")).await.unwrap(), b"m");
+        assert_eq!(vol.read_dir("/d").await.unwrap().len(), 17, "{width:?}");
+
+        // 128 emoji are 256 units: refused before anything is written.
+        let free = vol.free_clusters();
+        assert!(matches!(
+            vol.write(&format!("/d/{}", "😀".repeat(128)), b"").await.unwrap_err(),
+            Error::InvalidName { .. }
+        ));
+        assert_eq!(vol.free_clusters(), free);
+        assert_clean(&mut vol, &format!("{width:?} multi-cluster name")).await;
+    }
+}
+
+/// b1f840bab51e: the fixed FAT12/16 root does not grow, however the name is
+/// placed; it is still the root-full error, and nothing is left allocated.
+#[tokio::test]
+async fn a_full_fixed_root_is_still_reported_as_full() {
+    for (size, width) in [(8 * MIB, FatType::Fat12), (64 * MIB, FatType::Fat16)] {
+        let device = MemDevice::new(size);
+        let params = Params::new()
+            .fat_type(width)
+            .root_entries(16)
+            .label("TESTVOL")
+            .invariant();
+        format(&device, &params).await.unwrap();
+        let mut vol = Volume::open(device).await.unwrap();
+        vol.set_time(1_426_325_213);
+        // The label takes one slot; five 8.3 names leave ten.
+        for i in 0..5 {
+            vol.write(&format!("/F{i}.TXT"), b"").await.unwrap();
+        }
+        let free = vol.free_clusters();
+        let err = vol.write(&format!("/{}", "x".repeat(255)), b"data").await.unwrap_err();
+        assert!(matches!(err, Error::RootDirectoryFull { .. }), "{width:?}: {err:?}");
+        assert_eq!(vol.free_clusters(), free, "{width:?}: clusters stranded");
+        assert_clean(&mut vol, &format!("{width:?} root full")).await;
+    }
+}

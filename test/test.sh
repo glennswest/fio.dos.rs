@@ -47,6 +47,9 @@ cleanup() {
     rm -rf "$WORK"
 }
 trap cleanup EXIT
+# A signal ends the run through exit, so the EXIT trap undoes what it made.
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 now_ms() { date +%s%3N; }
 json_str() {
@@ -77,11 +80,17 @@ check() {
     fi
 }
 
-# Attach an image to a free loop device and print it. A pod's /dev is a copy
-# made when it started, so a loop device the node created since may have no
-# node here: make it (privileged pods may).
+# Attach an image to a free loop device; the device is left in $LOOP_DEV.
+# A pod's /dev is a copy made when it started, so a loop device the node
+# created since may have no node here: make it (privileged pods may).
+#
+# attach and kmount run in this shell, never in a command substitution: the
+# device goes in LOOPS for the EXIT trap, and an append made in a subshell
+# never reaches it (f1e178d2225e).
+LOOP_DEV=""
 attach() {
     local d n
+    LOOP_DEV=""
     d=$(losetup -f) || return 1
     # With no node for it here, losetup names it "/dev/loopN (lost)".
     d=${d%% *}
@@ -89,20 +98,29 @@ attach() {
     [ -b "$d" ] || mknod "$d" b 7 "$n" || return 1
     losetup "$d" "$1" || return 1
     LOOPS+=("$d")
-    echo "$d"
+    LOOP_DEV="$d"
 }
-detach() { losetup -d "$1"; }
-# kmount image mountpoint [options] — attach, then mount; prints the device.
+# Detach a device and stop tracking it, so the trap does not detach again a
+# number some later attach may have been given.
+detach() {
+    losetup -d "$1" || return 1
+    local kept=() d
+    for d in "${LOOPS[@]}"; do [ "$d" = "$1" ] || kept+=("$d"); done
+    LOOPS=("${kept[@]}")
+}
+# kmount image mountpoint [options] — attach, then mount; the device is left
+# in $LOOP_DEV.
 kmount() {
-    local d
-    d=$(attach "$1") || return 1
-    if mount -t vfat -o "${3:-utf8}" "$d" "$2"; then
-        echo "$d"
-    else
-        detach "$d"; return 1
+    attach "$1" || return 1
+    if ! mount -t vfat -o "${3:-utf8}" "$LOOP_DEV" "$2"; then
+        detach "$LOOP_DEV"; LOOP_DEV=""; return 1
     fi
 }
 kumount() { umount "$1" && detach "$2"; }
+
+# tests/test_sh.rs sources this far, with mocked losetup and mount, to check
+# the EXIT trap undoes what attach and kmount made.
+[ -n "${FIO_DOS_TEST_FUNCTIONS_ONLY:-}" ] && return 0
 
 # Can this node judge at all? A loop device and the vfat driver, both in the
 # node's kernel; nothing here assumes the machine.
@@ -110,9 +128,10 @@ KERNEL_OK=1 KERNEL_WHY=""
 t0=$(now_ms)
 probe="$WORK/probe.img"
 "$BIN/fill" "$probe" 1 fat12 >/dev/null 2>&1 || truncate -s 1M "$probe"
-if ! loopdev=$(attach "$probe" 2>&1); then
-    KERNEL_OK=0 KERNEL_WHY="no loop device on this node: $loopdev"
+if ! attach "$probe" 2>"$WORK/probe.err"; then
+    KERNEL_OK=0 KERNEL_WHY="no loop device on this node: $(cat "$WORK/probe.err")"
 else
+    loopdev=$LOOP_DEV
     mkdir -p "$WORK/probe.mnt"
     if mount -t vfat -o ro "$loopdev" "$WORK/probe.mnt" 2>"$WORK/probe.err"; then
         umount "$WORK/probe.mnt"
@@ -167,7 +186,8 @@ run_case() {
     MOUNTS+=("$mnt")
     local dev
     t0=$(now_ms)
-    if dev=$(kmount "$img" "$mnt" 2>"$WORK/$name.mount.err"); then
+    if kmount "$img" "$mnt" 2>"$WORK/$name.mount.err"; then
+        dev=$LOOP_DEV
         report "$name/kernel-mount" pass "$t0" "mounted on $dev"
     else
         report "$name/kernel-mount" fail "$t0" "$(cat "$WORK/$name.mount.err")"; return
@@ -228,7 +248,8 @@ run_case() {
     check "$name/round2-our-fsck" "fsck-fat clean" "$BIN/fsck-fat" "$img"
     check "$name/round2-dosfsck" "fsck.fat -n clean" dosfsck_clean "$img"
     t0=$(now_ms)
-    if dev=$(kmount "$img" "$mnt" 2>"$WORK/$name.mount.err"); then
+    if kmount "$img" "$mnt" 2>"$WORK/$name.mount.err"; then
+        dev=$LOOP_DEV
         report "$name/round2-kernel-mount" pass "$t0" "mounted again on $dev"
     else
         report "$name/round2-kernel-mount" fail "$t0" "$(cat "$WORK/$name.mount.err")"; return
