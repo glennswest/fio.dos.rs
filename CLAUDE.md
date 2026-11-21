@@ -203,7 +203,8 @@ on that host. The build does not yet fail on warnings (#5).
       6a6c8f2. sc-build of 6a6c8f2 cannot start: empty job id, then 404
       "no such build job", three times — stormcentral#1638 (/home full,
       database in I/O error). Parked behind it.
-      DONE (2026-11-21): sc-build job c0b7b1a401 (f37a77d, which carries
+      DONE (2026-11-21): sc-build jobs c0b7b1a401 (f37a77d) and f5fb77c43d
+      (e05c2e8), both carrying
       2e39e15 and 6a6c8f2) passed, the six new `dir` unit tests and
       `stale_slots_past_the_end_marker_stay_unreachable` and
       `an_alias_is_an_occupied_name` among them, fsck clean.
