@@ -184,3 +184,11 @@ on that host. The build does not yet fail on warnings (#5).
       second alias (`lookup` already resolves aliases since #12). Unit tests
       in `dir.rs`, a volume test with stale bytes past the root's end marker
       in `tests/paths.rs`, fsck at the end.
+      State (2026-11-21): fixes in 2e39e15, test corrected in 6a6c8f2.
+      sc-build of 2e39e15 ran: 37 unit (the new `dir` ones too), 9 fault
+      tests passed; the new volume test failed on the test's own setup
+      (`sub` made after the zeroed entry, so hidden by it) — fixed in
+      6a6c8f2. sc-build of 6a6c8f2 cannot start: empty job id, then 404
+      "no such build job", three times — stormcentral#1638 (/home full,
+      database in I/O error). Parked behind it; next: sc-build 6a6c8f2,
+      then close #14.
