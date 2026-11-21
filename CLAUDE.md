@@ -173,3 +173,14 @@ on that host. The build does not yet fail on warnings (#5).
       every FAT copy of it is written, and clears `fsinfo_dirty` only once the
       FSInfo write succeeds, so an error or a cancelled flush leaves the rest
       for the retry. Unit tests with a failing and a hanging device.
+- [ ] #14 — the 2 review findings in `src/dir.rs` (2026-11-20). Plan:
+      f81439860dd8: `find_free_run` treats every slot after the first zero
+      as free (bytes past the end marker are never read, so need not be
+      zero); `write_set` and `write_short` clear the slot after the written
+      run when the run consumed the end marker, so stale bytes past it stay
+      unreachable — files and the volume label alike. 43bd3bc2b137:
+      `build_set` refuses an exact 8.3 name another entry already answers to
+      (alias or long name) with `Exists`, instead of quietly generating a
+      second alias (`lookup` already resolves aliases since #12). Unit tests
+      in `dir.rs`, a volume test with stale bytes past the root's end marker
+      in `tests/paths.rs`, fsck at the end.
