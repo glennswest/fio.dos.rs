@@ -300,10 +300,12 @@ async fn a_file_cannot_be_given_a_structural_kind() {
 async fn stale_slots_past_the_end_marker_stay_unreachable() {
     for (size, width) in WIDTHS {
         let mut vol = volume(size).await;
+        // Everything that must stay visible comes before the entry whose
+        // first byte is zeroed: that zero ends the directory.
         vol.write("/A.TXT", b"kept").await.unwrap();
+        vol.mkdir("/sub").await.unwrap();
         vol.write("/B.TXT", b"").await.unwrap();
         vol.write("/C.TXT", b"").await.unwrap();
-        vol.mkdir("/sub").await.unwrap();
         vol.write("/sub/D.TXT", b"").await.unwrap();
         vol.write("/sub/E.TXT", b"").await.unwrap();
         vol.flush().await.unwrap();
