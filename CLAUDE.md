@@ -185,7 +185,7 @@ on that host. The build does not yet fail on warnings (#5).
       every FAT copy of it is written, and clears `fsinfo_dirty` only once the
       FSInfo write succeeds, so an error or a cancelled flush leaves the rest
       for the retry. Unit tests with a failing and a hanging device.
-- [ ] #14 — the 2 review findings in `src/dir.rs` (2026-11-20). Plan:
+- [x] #14 — the 2 review findings in `src/dir.rs` (2026-11-20). Plan:
       f81439860dd8: `find_free_run` treats every slot after the first zero
       as free (bytes past the end marker are never read, so need not be
       zero); `write_set` and `write_short` clear the slot after the written
@@ -202,5 +202,8 @@ on that host. The build does not yet fail on warnings (#5).
       (`sub` made after the zeroed entry, so hidden by it) — fixed in
       6a6c8f2. sc-build of 6a6c8f2 cannot start: empty job id, then 404
       "no such build job", three times — stormcentral#1638 (/home full,
-      database in I/O error). Parked behind it; next: sc-build 6a6c8f2,
-      then close #14.
+      database in I/O error). Parked behind it.
+      DONE (2026-11-21): sc-build job c0b7b1a401 (f37a77d, which carries
+      2e39e15 and 6a6c8f2) passed, the six new `dir` unit tests and
+      `stale_slots_past_the_end_marker_stay_unreachable` and
+      `an_alias_is_an_occupied_name` among them, fsck clean.
