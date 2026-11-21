@@ -120,18 +120,28 @@ pub fn find_label(data: &[u8]) -> Option<(usize, DirEntry)> {
     None
 }
 
+/// The slot holding the end marker — the first slot whose first byte is zero —
+/// or the slot count when the directory is full to its last slot.
+pub fn end_marker(data: &[u8]) -> usize {
+    data.chunks_exact(DIR_ENTRY_LEN)
+        .position(|chunk| chunk[0] == 0)
+        .unwrap_or(data.len() / DIR_ENTRY_LEN)
+}
+
 /// Find `needed` consecutive free slots, or say how many the directory would
 /// have to grow by.
 ///
 /// A run may end at the end of the directory, since the slots past the
-/// terminator are free as well — which is why the search does not stop at the
-/// first zero the way a read does.
+/// terminator are free as well. They are free whatever bytes they hold: a
+/// reader stops at the first zero and never looks past it, so a slot there
+/// that still carries an old entry is free all the same (f81439860dd8).
 pub fn find_free_run(data: &[u8], needed: usize) -> Option<usize> {
     let total = data.len() / DIR_ENTRY_LEN;
+    let end = end_marker(data);
     let mut run = 0usize;
     for slot in 0..total {
         let first = data[slot * DIR_ENTRY_LEN];
-        if first == 0 || first == DELETED_FLAG {
+        if slot >= end || first == DELETED_FLAG {
             run += 1;
             if run == needed {
                 return Some(slot + 1 - needed);
@@ -144,13 +154,32 @@ pub fn find_free_run(data: &[u8], needed: usize) -> Option<usize> {
 }
 
 /// Write a name's slots: the long-name fragments, then the short entry.
+///
+/// When the slots land on the end marker, the slot after them becomes the
+/// new one (see [`write_short`]).
 pub fn write_set(data: &mut [u8], at: usize, fragments: &[LfnEntry], entry: &DirEntry) {
+    let end = end_marker(data);
     for (i, fragment) in fragments.iter().enumerate() {
         let off = (at + i) * DIR_ENTRY_LEN;
         fragment.encode(&mut data[off..off + DIR_ENTRY_LEN]);
     }
-    let off = (at + fragments.len()) * DIR_ENTRY_LEN;
+    let last = at + fragments.len();
+    let off = last * DIR_ENTRY_LEN;
     entry.encode(&mut data[off..off + DIR_ENTRY_LEN]);
+    reseal(data, end, last);
+}
+
+/// After writing slots up to `last` into a directory whose end marker was at
+/// `end`: if the write reached the marker, zero the slot after it, so the
+/// directory still ends right after what was written. Whatever lay past the
+/// old marker — an old entry, a long-name fragment — was never part of the
+/// directory, and must not become part of it now (f81439860dd8).
+fn reseal(data: &mut [u8], end: usize, last: usize) {
+    let total = data.len() / DIR_ENTRY_LEN;
+    let next = last + 1;
+    if last >= end && next < total {
+        data[next * DIR_ENTRY_LEN..(next + 1) * DIR_ENTRY_LEN].fill(0);
+    }
 }
 
 /// Mark every slot of a name deleted.
@@ -164,10 +193,14 @@ pub fn erase_set(data: &mut [u8], entry: &Entry) {
     }
 }
 
-/// Overwrite one short entry in place, leaving its name and slots alone.
+/// Write one short entry: in place over an existing one, leaving its name and
+/// slots alone, or into a free slot (the volume label). A slot that was the
+/// end marker hands the marker on to the slot after it.
 pub fn write_short(data: &mut [u8], slot: usize, entry: &DirEntry) {
+    let end = end_marker(data);
     let off = slot * DIR_ENTRY_LEN;
     entry.encode(&mut data[off..off + DIR_ENTRY_LEN]);
+    reseal(data, end, slot);
 }
 
 /// Build the slots for a name: a short name that fits needs no fragments, and
@@ -189,10 +222,15 @@ pub fn build_set(name: &str, taken: &[Entry]) -> crate::error::Result<(Vec<LfnEn
             .any(|e| &e.entry.name == raw || name::names_equal(&e.name, &shown))
     };
 
+    // A name that is itself a valid 8.3 name, already answered to by another
+    // entry, is that entry's name. Giving it a second alias and storing the
+    // name as a long name would make one path name two files: a driver that
+    // matches the short name first finds the old one (43bd3bc2b137).
     if let Some(short) = name::exact_short_name(name) {
-        if !occupied(&short.raw) {
-            return Ok((Vec::new(), short));
+        if occupied(&short.raw) {
+            return Err(crate::error::Error::Exists(name.to_string()));
         }
+        return Ok((Vec::new(), short));
     }
 
     let short = name::generate_short_name(name, occupied)?;
@@ -365,5 +403,115 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "OTHERNAM.TXT");
     }
-}
 
+    /// A directory with an end marker at `end` and, past it, a stale short
+    /// entry and a stale long-name fragment, as an old image may hold.
+    fn stale_past_the_end(slots: usize, end: usize) -> Vec<u8> {
+        let mut data = empty_dir(slots);
+        for i in 0..end {
+            add(&mut data, &format!("F{i}.TXT"), Attributes::ARCHIVE, 2 + i as u32);
+        }
+        let stale = DirEntry {
+            name: *b"STALE   TXT",
+            attr: Attributes::ARCHIVE,
+            ..Default::default()
+        };
+        stale.encode(&mut data[(end + 1) * DIR_ENTRY_LEN..(end + 2) * DIR_ENTRY_LEN]);
+        let fragment = name::encode_lfn("Stale long name.txt", 0x5a);
+        fragment[0].encode(&mut data[(end + 2) * DIR_ENTRY_LEN..(end + 3) * DIR_ENTRY_LEN]);
+        let stale2 = DirEntry {
+            name: *b"STALE2  TXT",
+            attr: Attributes::ARCHIVE,
+            ..Default::default()
+        };
+        stale2.encode(&mut data[(end + 3) * DIR_ENTRY_LEN..(end + 4) * DIR_ENTRY_LEN]);
+        assert_eq!(end_marker(&data), end);
+        assert_eq!(parse(&data).len(), end, "the stale bytes are past the end");
+        data
+    }
+
+    /// f81439860dd8: a one-slot name written on the end marker moves the
+    /// marker on, so the stale entry behind it does not come to life.
+    #[test]
+    fn writing_on_the_end_marker_keeps_stale_slots_unreachable() {
+        let mut data = stale_past_the_end(16, 2);
+        add(&mut data, "NEW.TXT", Attributes::ARCHIVE, 9);
+        let names: Vec<_> = parse(&data).into_iter().map(|e| e.name).collect();
+        assert_eq!(names, ["F0.TXT", "F1.TXT", "NEW.TXT"]);
+        assert_eq!(end_marker(&data), 3);
+
+        // A long name spanning the old marker: same.
+        let mut data = stale_past_the_end(16, 2);
+        add(&mut data, "A Long File Name.txt", Attributes::ARCHIVE, 9);
+        let names: Vec<_> = parse(&data).into_iter().map(|e| e.name).collect();
+        assert_eq!(names, ["F0.TXT", "F1.TXT", "A Long File Name.txt"]);
+        assert_eq!(end_marker(&data), 5);
+    }
+
+    /// f81439860dd8: slots past the end marker are free whatever they hold.
+    #[test]
+    fn slots_past_the_end_marker_are_free_whatever_they_hold() {
+        let data = stale_past_the_end(8, 2);
+        // Slots 2..8 are free: six of them, though 3, 4 and 5 are not zero.
+        assert_eq!(find_free_run(&data, 6), Some(2));
+        assert_eq!(find_free_run(&data, 7), None);
+
+        // A deleted slot just before the marker joins the run past it.
+        let mut data = stale_past_the_end(8, 2);
+        data[DIR_ENTRY_LEN] = DELETED_FLAG;
+        assert_eq!(find_free_run(&data, 3), Some(1));
+    }
+
+    /// f81439860dd8: the volume label, written on the end marker, moves it on.
+    #[test]
+    fn a_label_on_the_end_marker_moves_it_on() {
+        let mut data = stale_past_the_end(8, 1);
+        let at = find_free_run(&data, 1).unwrap();
+        assert_eq!(at, 1);
+        let label = DirEntry {
+            name: *b"MYVOLUME   ",
+            attr: Attributes::VOLUME_ID,
+            ..Default::default()
+        };
+        write_short(&mut data, at, &label);
+        assert_eq!(find_label(&data).unwrap().0, 1);
+        assert_eq!(end_marker(&data), 2);
+        let names: Vec<_> = parse(&data).into_iter().map(|e| e.name).collect();
+        assert_eq!(names, ["F0.TXT"]);
+    }
+
+    /// A write that fills the directory's last slot has no slot after it to
+    /// clear, and the directory simply ends with its last cluster.
+    #[test]
+    fn the_last_slot_needs_no_marker_after_it() {
+        let mut data = empty_dir(2);
+        add(&mut data, "ONE.TXT", Attributes::ARCHIVE, 2);
+        add(&mut data, "TWO.TXT", Attributes::ARCHIVE, 3);
+        assert_eq!(end_marker(&data), 2);
+        assert_eq!(parse(&data).len(), 2);
+    }
+
+    /// 43bd3bc2b137: an 8.3 name that is already another entry's alias is
+    /// that entry's name, not a new one with a second alias.
+    #[test]
+    fn an_exact_name_taken_as_an_alias_is_refused() {
+        let mut data = empty_dir(16);
+        add(&mut data, "Program Files", Attributes::DIRECTORY, 2);
+        assert_eq!(parse(&data)[0].entry.name, *b"PROGRA~1   ");
+        for name in ["PROGRA~1", "progra~1"] {
+            assert!(matches!(
+                build_set(name, &parse(&data)),
+                Err(crate::error::Error::Exists(_))
+            ), "{name}");
+        }
+        // And an exact name that is another entry's long name.
+        add(&mut data, "OTHER.TXT", Attributes::ARCHIVE, 3);
+        assert!(matches!(
+            build_set("other.txt", &parse(&data)),
+            Err(crate::error::Error::Exists(_))
+        ));
+        // A long name still gets the next free alias.
+        let (_, short) = build_set("Program Files 2", &parse(&data)).unwrap();
+        assert_eq!(&short.raw, b"PROGRA~2   ");
+    }
+}

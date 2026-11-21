@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### 2026-11-20
+- **fix:** The review findings on `src/dir.rs` (#14):
+  - Slots past a directory's end marker are free whatever bytes they hold,
+    and a name or volume label written on the marker zeroes the slot after
+    it, so an old entry or long-name fragment left past the marker on an
+    existing image never comes to life (f81439860dd8).
+  - `build_set` refuses an exact 8.3 name that another entry already answers
+    to, as alias or long name, with `Exists`, rather than storing it as a long
+    name over a second alias (43bd3bc2b137).
+  - Tests: stale entries past the marker (files, long names, the label) in
+    `dir::tests`, and on a volume of each width in `tests/paths.rs`, fsck
+    clean after; an alias as an occupied name on create, write and rename.
 - **fix:** The review findings on `src/alloc.rs` (#13):
   - `Allocator::flush` keeps a FAT sector dirty until every FAT copy of it is
     written, and the FSInfo until its write succeeds, so a flush that fails or

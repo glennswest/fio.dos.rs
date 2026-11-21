@@ -291,3 +291,75 @@ async fn a_file_cannot_be_given_a_structural_kind() {
     assert_eq!(names(&vol.read_dir("/").await.unwrap()), ["dir", "file.txt"]);
     assert_clean(&mut vol, "attributes").await;
 }
+
+/// f81439860dd8: bytes past a directory's end marker are not part of it, and
+/// a name written on the marker must not bring them back. An image another
+/// writer left — an entry whose first byte was zeroed, the entries after it
+/// intact — is made here by zeroing one byte on the device.
+#[tokio::test]
+async fn stale_slots_past_the_end_marker_stay_unreachable() {
+    for (size, width) in WIDTHS {
+        let mut vol = volume(size).await;
+        vol.write("/A.TXT", b"kept").await.unwrap();
+        vol.write("/B.TXT", b"").await.unwrap();
+        vol.write("/C.TXT", b"").await.unwrap();
+        vol.mkdir("/sub").await.unwrap();
+        vol.write("/sub/D.TXT", b"").await.unwrap();
+        vol.write("/sub/E.TXT", b"").await.unwrap();
+        vol.flush().await.unwrap();
+
+        let mut image = vol.filesystem().device().to_vec();
+        for stale in [b"B       TXT", b"D       TXT"] {
+            let at = image
+                .windows(11)
+                .position(|w| w == stale)
+                .expect("the entry is on the device");
+            image[at] = 0;
+        }
+        let mut vol = Volume::open(MemDevice::from_vec(image)).await.unwrap();
+        vol.set_time(1_426_325_213);
+        assert_eq!(names(&vol.read_dir("/").await.unwrap()), ["A.TXT", "sub"], "{width:?}");
+        assert_eq!(names(&vol.read_dir("/sub").await.unwrap()), [] as [&str; 0]);
+
+        // A one-slot name on the root's marker, and a long name on the
+        // subdirectory's.
+        vol.write("/NEW.TXT", b"new").await.unwrap();
+        vol.write("/sub/A Long Name.txt", b"long").await.unwrap();
+        assert_eq!(
+            names(&vol.read_dir("/").await.unwrap()),
+            ["A.TXT", "NEW.TXT", "sub"],
+            "{width:?}: C.TXT stayed past the end"
+        );
+        assert_eq!(names(&vol.read_dir("/sub").await.unwrap()), ["A Long Name.txt"]);
+        assert!(!vol.exists("/C.TXT").await.unwrap());
+        assert!(!vol.exists("/sub/E.TXT").await.unwrap());
+        assert_eq!(vol.read("/NEW.TXT").await.unwrap(), b"new");
+        assert_eq!(vol.read("/sub/A Long Name.txt").await.unwrap(), b"long");
+        assert_clean(&mut vol, &format!("{width:?} stale")).await;
+    }
+}
+
+/// 43bd3bc2b137: an 8.3 name another entry answers to as its alias is that
+/// entry, in every way a name can be given.
+#[tokio::test]
+async fn an_alias_is_an_occupied_name() {
+    for (size, width) in WIDTHS {
+        let mut vol = volume(size).await;
+        vol.mkdir("/Program Files").await.unwrap();
+        assert_eq!(vol.stat("/Program Files").await.unwrap().short_name, "PROGRA~1");
+        assert!(matches!(vol.mkdir("/PROGRA~1").await.unwrap_err(), Error::Exists(_)));
+        assert!(matches!(
+            vol.write("/progra~1", b"x").await.unwrap_err(),
+            Error::IsADirectory(_)
+        ));
+        vol.write("/x.txt", b"x").await.unwrap();
+        assert!(matches!(
+            vol.rename("/x.txt", "/PROGRA~1").await.unwrap_err(),
+            Error::Exists(_)
+        ));
+        vol.write("/PROGRA~1/inside.txt", b"in").await.unwrap();
+        assert_eq!(vol.read("/Program Files/inside.txt").await.unwrap(), b"in");
+        assert_eq!(names(&vol.read_dir("/").await.unwrap()), ["Program Files", "x.txt"], "{width:?}");
+        assert_clean(&mut vol, &format!("{width:?} alias occupied")).await;
+    }
+}
