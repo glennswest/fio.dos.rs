@@ -432,10 +432,16 @@ async fn a_full_fixed_root_is_still_reported_as_full() {
         format(&device, &params).await.unwrap();
         let mut vol = Volume::open(device).await.unwrap();
         vol.set_time(1_426_325_213);
-        // The label takes one slot; five 8.3 names leave ten.
-        for i in 0..5 {
+        // The formatter rounds the root up to whole clusters, so the size is
+        // what the boot sector says. The label takes one slot; 8.3 names fill
+        // the rest but ten, too few for the 21 a 255-unit name needs.
+        let entries = vol.filesystem().boot().root_entries as usize;
+        assert!(entries >= 16, "{width:?}: {entries} root entries");
+        for i in 0..entries - 11 {
             vol.write(&format!("/F{i}.TXT"), b"").await.unwrap();
         }
+        assert!(vol.write("/G.TXT", b"").await.is_ok(), "{width:?}: a slot is left");
+        vol.unlink("/G.TXT").await.unwrap();
         let free = vol.free_clusters();
         let err = vol.write(&format!("/{}", "x".repeat(255)), b"data").await.unwrap_err();
         assert!(matches!(err, Error::RootDirectoryFull { .. }), "{width:?}: {err:?}");
